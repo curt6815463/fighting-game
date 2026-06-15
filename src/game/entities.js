@@ -38,6 +38,10 @@ export function makePlayer(id, name, charId, x, y, team = 0) {
     trail: null,    // 移動留痕 { remaining,spacing,lastx,lasty,zone }
     still: 0,       // 靜止累計秒數 (忍者煙遁天賦)
     combo: 0, comboTimer: 0, // 連擊層數 (格鬥家天賦)
+    iaiTimer: 0,            // 未攻擊計時 (武士居合之道)
+    suppressTarget: null, suppressStacks: 0, // 同目標連擊層數 (槍手火力壓制)
+    ownerId: null,          // 召喚物所屬主人 (一般玩家為 null)
+    summonLife: 0,          // 召喚物剩餘存活秒數 (0 = 永久/非召喚物)
   };
 }
 
@@ -139,6 +143,8 @@ export function makeZone(owner, x, y, opt) {
     lifetime: opt.lifetime, tick: opt.tick, tickTimer: 0,
     delay: opt.delay || 0,
     effect: opt.effect || null, color: opt.color,
+    effects: opt.effects || null,                 // 多重 debuff (對敵人逐一施加，如咒術師衰弱領域)
+    allyEffect: opt.allyEffect || null,           // 友方增益 (圈內友方每跳施加，如加速)
     knockback: opt.knockback || 0,                // tick 時把命中敵人推離中心 (地裂線/震地)
     vx: opt.vx || 0, vy: opt.vy || 0,           // 移動範圍區 (火牆/地裂線)
     follow: opt.follow ? owner : null,          // 跟隨擁有者 (光環)
@@ -161,10 +167,20 @@ export const missingHp = (p) => 1 - p.hp / p.maxHp;
 
 // 敵我判定：同一正數隊伍 = 友方；team 0 (單人) 與所有人為敵。自己永遠非敵。
 // ownerId 為攻擊來源 (玩家/投射物/zone 的 owner)。
+// 陣營判定鍵：正數隊伍 → 't'+team；單人(team 0) 的召喚物繼承主人身分，其餘各自為一方。
+// 讓 FFA 召喚物與主人/同隊互為友方、與其他玩家為敵；不影響既有 team 制(魔王模式/組隊)。
+export function factionKey(state, p) {
+  if (!p) return null;
+  if (p.team > 0) return 't' + p.team;
+  const root = (p.ownerId && state.players[p.ownerId]) ? state.players[p.ownerId] : p;
+  if (root.team > 0) return 't' + root.team;
+  return 'p' + root.id;
+}
+
 export function isEnemy(state, ownerId, target) {
   if (!target || !target.alive || target.id === ownerId) return false;
   const owner = state.players[ownerId];
-  if (owner && owner.team > 0 && owner.team === target.team) return false; // 友方
+  if (owner && factionKey(state, owner) === factionKey(state, target)) return false; // 同陣營(含召喚物)→非敵
   return true;
 }
 
@@ -173,12 +189,61 @@ export function isAlly(state, ownerId, target) {
   if (!target || !target.alive) return false;
   if (target.id === ownerId) return true; // 自身也算友方 (heal/shield 含自己)
   const owner = state.players[ownerId];
-  return !!(owner && owner.team > 0 && owner.team === target.team);
+  return !!(owner && factionKey(state, owner) === factionKey(state, target));
+}
+
+// 吟遊詩人戰歌共鳴：回傳 attacker 可獲得的增傷比例 (來自同陣營且在範圍內的詩人，依其周圍友方數量)。
+function warsongFor(state, attacker) {
+  let best = 0;
+  for (const b of Object.values(state.players)) {
+    if (!b.alive) continue;
+    const bt = getCharacter(b.charId).talent;
+    if (!bt || bt.id !== 'warsong') continue;
+    if (!(b.id === attacker.id || isAlly(state, b.id, attacker))) continue;
+    const r = bt.radius || 250;
+    if (Math.hypot(b.x - attacker.x, b.y - attacker.y) > r) continue;
+    let allies = 0;
+    for (const o of Object.values(state.players)) {
+      if (!o.alive) continue;
+      if (!(o.id === b.id || isAlly(state, b.id, o))) continue;
+      if (Math.hypot(b.x - o.x, b.y - o.y) <= r) allies++;
+    }
+    best = Math.max(best, Math.min(bt.maxAllies || 3, Math.max(0, allies - 1)) * (bt.perAlly || 0.05));
+  }
+  return best;
+}
+
+// 咒術師詛咒擴散：帶易傷詛咒的敵人死亡時，向附近敵人傳染易傷 (需場上存在咒術師)。
+function spreadCurse(state, corpse) {
+  let hexer = null;
+  for (const o of Object.values(state.players)) {
+    if (!o.alive) continue;
+    const t = getCharacter(o.charId).talent;
+    if (t && t.id === 'plague') { hexer = o; break; }
+  }
+  if (!hexer) return;
+  const w = corpse.effects.weaken;
+  const r = (getCharacter(hexer.charId).talent.radius) || 200;
+  for (const o of Object.values(state.players)) {
+    if (o.id === corpse.id || !isEnemy(state, hexer.id, o)) continue;
+    if (Math.hypot(o.x - corpse.x, o.y - corpse.y) <= r) applyEffect(o, 'weaken', { duration: w.remaining, factor: w.factor });
+  }
+  addFx(state, { type: 'buff', x: corpse.x, y: corpse.y, color: '#bb6bd9', life: 0.4, radius: r, vfx: 'hexer_field' });
 }
 
 // 天賦傷害修正 (攻擊者增傷 / 受害者減傷)；回傳修正後傷害。純函式，副作用(回魔/連擊/吸血)在 dealDamage 內處理。
-function talentDamageMods(attacker, target, amount) {
+function talentDamageMods(state, attacker, target, amount) {
   let dmg = amount;
+  // ---- 受害者天賦：減傷 ----
+  if (target && target.alive) {
+    const dt = getCharacter(target.charId).talent;
+    if (dt && dt.id === 'summonbond') { // 召喚師：每存活召喚物減傷
+      let n = 0;
+      for (const o of Object.values(state.players)) if (o.isMinion && o.ownerId === target.id && o.alive) n++;
+      if (n > 0) dmg *= 1 - Math.min(dt.maxStacks || 3, n) * (dt.dr || 0.1);
+    }
+  }
+  // ---- 攻擊者天賦：增傷 ----
   if (attacker && attacker.alive) {
     const at = getCharacter(attacker.charId).talent;
     if (at) {
@@ -191,8 +256,19 @@ function talentDamageMods(attacker, target, amount) {
       } else if (at.id === 'momentum') { // 格鬥家：連擊層數增傷
         const s = Math.min(at.maxStacks || 5, attacker.combo || 0);
         if (s > 0) dmg *= 1 + s * (at.perStack || 0.1);
+      } else if (at.id === 'shadowstrike') { // 忍者：對被控制的敵人增傷
+        const e = target.effects || {};
+        if (e.stun || e.root || e.slow || e.chill || e.frozen) dmg *= 1 + (at.bonus || 0.35);
+      } else if (at.id === 'suppress') { // 槍手：同目標連擊層數增傷
+        if (attacker.suppressTarget === target.id) {
+          const s = Math.min(at.maxStacks || 5, attacker.suppressStacks || 0);
+          if (s > 0) dmg *= 1 + s * (at.perStack || 0.08);
+        }
       }
     }
+    // 吟遊詩人戰歌共鳴：自身與附近友方皆受惠
+    const ws = warsongFor(state, attacker);
+    if (ws > 0) dmg *= 1 + ws;
   }
   return dmg;
 }
@@ -231,18 +307,30 @@ export function dealDamage(state, target, amount, attackerId, opts = {}) {
   if (state.flags && state.flags.noDamage) return;
 
   let dmg = amount;
-  if (!opts.noTalent && hostile) dmg = talentDamageMods(attacker, target, dmg);
+  if (!opts.noTalent && hostile) dmg = talentDamageMods(state, attacker, target, dmg);
+  // 削弱輸出 (咒術師 dmg_reduce)：攻擊者輸出降低
+  if (hostile && attacker.effects && attacker.effects.dmg_reduce) dmg *= 1 - (attacker.effects.dmg_reduce.factor || 0);
   if (target.isBoss) dmg = bossDamageMods(state, target, attacker, dmg); // 魔王正面重甲/背後弱點/護盾
   // 死亡印記：受傷放大 (刺客標記引爆體系)
   if (target.effects && target.effects.mark) dmg *= 1 + target.effects.mark.bonus;
+  // 易傷詛咒 (咒術師 weaken)：受傷放大
+  if (target.effects && target.effects.weaken) dmg *= 1 + (target.effects.weaken.factor || 0);
   // 友方減傷光環 (坦克大招 protect 效果)
   if (target.effects && target.effects.protect) dmg *= 1 - (target.effects.protect.factor || 0);
 
-  // 荊棘反傷：依「嘗試造成的傷害」彈回攻擊者，即使被護盾吸收仍反彈
+  // 荆棘反傷：依「嘗試造成的傷害」彈回攻擊者，即使被護盾吸收仍反彈
   // (反震盾/招架本身會附帶護盾，若只反彈穿透傷害會完全失效)
   if (!opts.noReflect && hostile && target.effects && target.effects.reflect) {
     const rdmg = dmg * (target.effects.reflect.factor || 0);
     if (rdmg > 0) dealDamage(state, attacker, rdmg, target.id, { noReflect: true, noTalent: true });
+  }
+  // 聖騎士天賦聖光懲戒：被攻擊時依嘗試傷害回擊 (與護盾無關，被動觸發)
+  if (!opts.noReflect && hostile) {
+    const tt = getCharacter(target.charId).talent;
+    if (tt && tt.id === 'retribution') {
+      const rdmg = dmg * (tt.factor || 0.15);
+      if (rdmg > 0) dealDamage(state, attacker, rdmg, target.id, { noReflect: true, noTalent: true });
+    }
   }
 
   if (target.shield > 0) {
@@ -260,7 +348,7 @@ export function dealDamage(state, target, amount, attackerId, opts = {}) {
     const ls = dmg * (attacker.effects.lifesteal.factor || 0);
     if (ls > 0) attacker.hp = Math.min(attacker.maxHp, attacker.hp + ls);
   }
-  // 天賦命中副作用 (回魔 / 嗜血吸血 / 連擊累積)
+  // 天賦命中副作用 (回魔 / 嗜血吸血 / 連擊累積 / 連續壓制)
   if (!opts.noTalent && hostile) {
     const at = getCharacter(attacker.charId).talent;
     if (at) {
@@ -269,6 +357,18 @@ export function dealDamage(state, target, amount, attackerId, opts = {}) {
         const ls = dmg * (at.lifesteal || 0.25) * (0.4 + missingHp(attacker));
         if (ls > 0) attacker.hp = Math.min(attacker.maxHp, attacker.hp + ls);
       } else if (at.id === 'momentum') { attacker.combo = Math.min(at.maxStacks || 5, (attacker.combo || 0) + 1); attacker.comboTimer = at.window || 2.2; }
+      else if (at.id === 'suppress') {
+        if (attacker.suppressTarget === target.id) attacker.suppressStacks = Math.min(at.maxStacks || 5, (attacker.suppressStacks || 0) + 1);
+        else { attacker.suppressTarget = target.id; attacker.suppressStacks = 1; }
+      }
+    }
+  }
+  // 召喚共鏈 (召喚師天賦)：召喚物命中敵人回復主人
+  if (hostile && attacker.isMinion && attacker.ownerId) {
+    const owner = state.players[attacker.ownerId];
+    if (owner && owner.alive) {
+      const ot = getCharacter(owner.charId).talent;
+      if (ot && ot.id === 'summonbond') owner.hp = Math.min(owner.maxHp, owner.hp + (ot.heal || 5));
     }
   }
 
@@ -277,6 +377,8 @@ export function dealDamage(state, target, amount, attackerId, opts = {}) {
     target.alive = false;
     const killer = state.players[attackerId];
     if (killer && killer.id !== target.id) killer.kills++;
+    // 詛咒擴散 (咒術師天賦)：帶易傷詛咒的敵人死亡 → 傳染給附近敵人
+    if (target.effects && target.effects.weaken) spreadCurse(state, target);
     addFx(state, { type: 'death', x: target.x, y: target.y, color: '#ffffff', life: 0.5, radius: PLAYER_RADIUS * 2 });
   }
 }
@@ -291,6 +393,7 @@ export function applyEffect(p, kind, data, srcId) {
   if (kind === 'cleanse') {
     delete p.effects.slow; delete p.effects.stun; delete p.effects.burn;
     delete p.effects.bleed; delete p.effects.chill; delete p.effects.root; delete p.effects.mark; delete p.effects.frozen;
+    delete p.effects.weaken; delete p.effects.dmg_reduce;
     return;
   }
   if (kind === 'burn') {
@@ -356,6 +459,18 @@ export function applyEffect(p, kind, data, srcId) {
       froze: cur ? cur.froze : false,
       srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
     };
+    return;
+  }
+  if (kind === 'weaken') {
+    // 易傷詛咒：受傷增加 (刷新取較高倍率與較長時間)
+    const cur = p.effects.weaken;
+    p.effects.weaken = { remaining: Math.max(cur ? cur.remaining : 0, data.duration || 3), factor: Math.max(cur ? cur.factor : 0, data.factor || 0.15) };
+    return;
+  }
+  if (kind === 'dmg_reduce') {
+    // 衰弱：輸出降低 (刷新取較高倍率與較長時間)
+    const cur = p.effects.dmg_reduce;
+    p.effects.dmg_reduce = { remaining: Math.max(cur ? cur.remaining : 0, data.duration || 3), factor: Math.max(cur ? cur.factor : 0, data.factor || 0.25) };
     return;
   }
   if (kind === 'root') { p.effects.root = { remaining: data.duration || 1 }; return; }

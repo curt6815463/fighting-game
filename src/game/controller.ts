@@ -9,6 +9,7 @@ import { createRenderer } from './renderer.js';
 import { createNetwork, makeRoomCode } from './network.js';
 import { createInput, EMPTY_INPUT } from './input.js';
 import { createInitialState } from './entities.js';
+import { CHARACTERS } from './characters.js';
 import { startBossRound } from './bossMode.js';
 import { step, applyMovement } from './simulation.js';
 import { DT, SNAPSHOT_INTERVAL, INPUT_INTERVAL, MAX_PLAYERS } from './constants.js';
@@ -400,7 +401,7 @@ function createController(): GameController {
     if (role !== 'host') return;
     if (lobby.length >= MAX_PLAYERS) return;
     const npcId = 'npc-' + Math.random().toString(36).slice(2, 8);
-    const charId = Math.floor(Math.random() * 10);
+    const charId = Math.floor(Math.random() * CHARACTERS.length);
     const npcNum = lobby.filter((p) => p.isNpc).length + 1;
     lobby.push({ id: npcId, name: `NPC ${npcNum}`, charId, controlScheme: 'wasd-jkl', isHost: false, isNpc: true, team: 0 });
     broadcastLobby();
@@ -431,12 +432,12 @@ function createController(): GameController {
 
     // 生成隨機玩家（2-4個角色）
     const numPlayers = Math.floor(Math.random() * 3) + 2; // 2-4 players
-    const allCharIds = Array.from({ length: 10 }, (_, i) => i); // 0-9 characters
+    const allCharIds = Array.from({ length: CHARACTERS.length }, (_, i) => i); // 0..N-1 characters
     lobby = [];
 
     // 自己：使用指定的角色或隨機選取
     let charForSelf: number;
-    if (charId !== undefined && charId >= 0 && charId < 10) {
+    if (charId !== undefined && charId >= 0 && charId < CHARACTERS.length) {
       charForSelf = charId;
     } else {
       charForSelf = allCharIds[Math.floor(Math.random() * allCharIds.length)];
@@ -468,10 +469,10 @@ function createController(): GameController {
     role = 'host';
     selfId = 'dev-' + Math.random().toString(36).slice(2, 9);
     roomCode = 'DEV';
-    const all = Array.from({ length: 10 }, (_, i) => i);
-    const me = (charId !== undefined && charId >= 0 && charId < 10) ? charId : all[Math.floor(Math.random() * 10)];
+    const all = Array.from({ length: CHARACTERS.length }, (_, i) => i);
+    const me = (charId !== undefined && charId >= 0 && charId < CHARACTERS.length) ? charId : all[Math.floor(Math.random() * all.length)];
     lobby = [{ id: selfId, name: myName, charId: me, controlScheme: selectedControlScheme, isHost: true, team: 1 }];
-    for (let i = 1; i <= 2; i++) lobby.push({ id: 'dev-' + i, name: '隊友 ' + i, charId: all[Math.floor(Math.random() * 10)], controlScheme: 'wasd-jkl', isHost: false, team: 1 });
+    for (let i = 1; i <= 2; i++) lobby.push({ id: 'dev-' + i, name: '隊友 ' + i, charId: all[Math.floor(Math.random() * all.length)], controlScheme: 'wasd-jkl', isHost: false, team: 1 });
     selectedChar = me; selectedTeam = 1;
     startBossGame();
   }

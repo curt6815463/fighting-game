@@ -9,5 +9,13 @@ import './berserker.js';
 import './ninja.js';
 import './elementalist.js';
 import './fighter.js';
+import './paladin.js';
+import './hexer.js';
+import './bard.js';
+import './samurai.js';
+import './gunner.js';
+import './summoner.js';
+import './necromancer.js';
+import './chronomancer.js';
 
 export { getVfx, hasVfx, registerVfx } from './registry.js';

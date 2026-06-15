@@ -46,6 +46,8 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl') {
     if (e && e.charId !== p.charId) { disposeModel(e); models.delete(p.id); e = null; }
     if (!e) {
       const group = p.isPart ? createPartModel(p.partColor || '#ffffff', p.scale || 1) : createCharacterModel(p.charId);
+      // 召喚物 (非魔王) 依 scale 縮小，呈現「小型戰靈」感；魔王模型已於 createCharacterModel 內套 scale，勿重複。
+      if (!p.isPart && !p.isBoss && p.scale && p.scale !== 1) group.scale.setScalar(p.scale);
       group.position.set(sceneX(p.x), 0, sceneZ(p.y));
       scene.add(group);
       // rx/ry：渲染端平滑後的世界座標 (邏輯 30Hz、畫面 60Hz 之間插值)；spd：平滑速度

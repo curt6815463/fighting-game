@@ -57,6 +57,7 @@ function outMult(p, a) {
   let m = 1;
   if (a.lowHpBonus) m *= 1 + (1 - p.hp / p.maxHp);
   if (p.effects.rage) m *= p.effects.rage.dmg;
+  if (p.iaiReady) { const t = getCharacter(p.charId).talent; m *= 1 + ((t && t.bonus) || 0.8); } // 武士居合之道蔓勢一擊
   return m;
 }
 
@@ -206,6 +207,7 @@ function executeAction(state, p, a, opts = {}) {
       p.x = clamp(p.x + cos * a.range, PLAYER_RADIUS, ARENA.width - PLAYER_RADIUS);
       p.y = clamp(p.y + sin * a.range, PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
       if (a.dmg) meleeHit(state, p, { dmg: a.dmg, range: a.hitRadius || 90, arc: 7, knockback: a.knockback || 0, effect: a.effect, detonate: a.detonate }, true); // 落點全方位爆發 (位置已是傳送後，teleport range 與命中半徑分開)
+      if (a.leaveZone) state.zones.push(makeZone(p.id, p.x, p.y, a.leaveZone)); // 落點生成地面區 (忍者煙幕)
       if (!silent) addFx(state, { type: 'blink', x: p.x, y: p.y, facing: p.facing, range: a.range, color: a.color, life: 0.3, radius: a.hitRadius || PLAYER_RADIUS * 1.6, vfx: a.vfx });
       break;
     }
@@ -225,7 +227,7 @@ function executeAction(state, p, a, opts = {}) {
         p.x = clamp(o.x + Math.cos(ang) * (PLAYER_RADIUS * 2), PLAYER_RADIUS, ARENA.width - PLAYER_RADIUS);
         p.y = clamp(o.y + Math.sin(ang) * (PLAYER_RADIUS * 2), PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
         p.facing = Math.atan2(o.y - p.y, o.x - p.x);
-        dealDamage(state, o, a.dmg, p.id);
+        dealDamage(state, o, a.dmg * outMult(p, a), p.id);
         if (a.knockback) { const dx = o.x - p.x, dy = o.y - p.y, d = Math.hypot(dx, dy) || 1; o.kvx += dx / d * a.knockback; o.kvy += dy / d * a.knockback; }
         if (a.effect) applyEffectFrom(state, o, a.effect, p.id);
         addFx(state, { type: 'blink', x: p.x, y: p.y, color: a.color, life: 0.24, radius: PLAYER_RADIUS * 1.8, vfx: a.vfx });
@@ -282,6 +284,8 @@ function executeAction(state, p, a, opts = {}) {
       if (a.recoil) { p.kvx -= cos * a.recoil; p.kvy -= sin * a.recoil; }
       break;
     }
+    // ======== 一般角色召喚 (召喚師/死靈法師) ========
+    case 'summon': summonMinions(state, p, a); break;
     // ======== 闖關模式魔王自訂動作 ========
     case 'summon_clones': bossSummonClones(state, p, a); break;
     case 'summon_minions': bossSummonMinions(state, p, a); break;
@@ -299,6 +303,7 @@ function executeAction(state, p, a, opts = {}) {
     case 'mirror_players': bossMirrorPlayers(state, p, a); break;
     case 'steal_ultimate': bossStealUltimate(state, p, a); break;
   }
+  if (a.rewindSelf) chronoRewindSelf(state, p, a); // 時空術士大招時空逆轉 (先引爆 zone，再回溯自身)
   if (a.self) applySelfBuff(p, a.self);
   if (a.ally) applyAllyBuff(state, p, a.ally); // 施放瞬間對友軍的 AoE 增益 (治療/護盾/減傷)
 }
@@ -414,6 +419,65 @@ function bossStealUltimate(state, boss, a) {
   addFx(state, { type: 'ultimate', x: boss.x, y: boss.y, color: a.color, life: 0.6, radius: ult.radius || 140 });
 }
 
+// ======== 一般角色召喚系統 (召喚師 / 死靈法師) ========
+// 任意定點圓形 AoE (供召喚物自爆等需要在「非施法者位置」結算的情況)。
+function aoeAt(state, ownerId, x, y, opt) {
+  for (const o of Object.values(state.players)) {
+    if (!isEnemy(state, ownerId, o)) continue;
+    const dx = o.x - x, dy = o.y - y, d = Math.hypot(dx, dy);
+    if (d > (opt.radius || 120) + bodyR(o)) continue;
+    if (opt.dmg) dealDamage(state, o, opt.dmg, ownerId);
+    if (opt.knockback && d > 0) { o.kvx += dx / d * opt.knockback; o.kvy += dy / d * opt.knockback; }
+    if (opt.effect) applyEffectFrom(state, o, opt.effect, ownerId);
+  }
+}
+
+let _summonSeq = 1;
+function summonMinions(state, summoner, a) {
+  if (a.detonate) { detonateMinions(state, summoner, a); return; }
+  const cap = a.cap || 3;
+  let alive = 0;
+  for (const o of Object.values(state.players)) if (o.isSummon && o.ownerId === summoner.id && o.alive) alive++;
+  const n = Math.min(a.count || 1, Math.max(0, cap - alive));
+  for (let i = 0; i < n; i++) {
+    // 生成在主人身後扇形散開
+    const ang = summoner.facing + Math.PI + (i - (n - 1) / 2) * 0.6;
+    const x = clamp(summoner.x + Math.cos(ang) * 52, PLAYER_RADIUS, ARENA.width - PLAYER_RADIUS);
+    const y = clamp(summoner.y + Math.sin(ang) * 52, PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
+    const id = 'sum-' + summoner.id + '-' + (_summonSeq++);
+    const m = makeBoss(id, a.minionCharId != null ? a.minionCharId : 9, x, y, summoner.team, {
+      isMinion: true, ownerId: summoner.id, aiId: 'minion', maxHp: a.minionHp || 160, scale: a.minionScale || 0.7, facing: summoner.facing,
+    });
+    m.isSummon = true;                 // 玩家召喚物 (host-only 標記，供到期/清除)
+    m.summonLife = a.minionLife || 14; // 存活秒數
+    state.players[id] = m;
+    addFx(state, { type: 'blink', x, y, color: a.color, life: 0.42, radius: 64, vfx: a.vfx });
+  }
+  if (a.zone) state.zones.push(makeZone(summoner.id, summoner.x, summoner.y, a.zone)); // 大招附帶範圍區 (亡靈大軍腐蝕)
+}
+
+// 犧牲所有召喚物，每隻在原地爆炸 (召喚師靈魂爆破)。
+function detonateMinions(state, summoner, a) {
+  for (const o of Object.values(state.players)) {
+    if (!o.isSummon || o.ownerId !== summoner.id || !o.alive) continue;
+    aoeAt(state, summoner.id, o.x, o.y, { radius: a.radius || 120, dmg: a.dmg || 60, knockback: a.knockback || 120, effect: a.effect });
+    addFx(state, { type: 'hit', x: o.x, y: o.y, color: a.color, life: 0.3, radius: a.radius || 120, vfx: a.vfx });
+    o.hp = 0; o.alive = false;
+  }
+}
+
+// 時空術士大招「時空逆轉」：回溯自身到 N 秒前的位置與血量 (取較高血量)。
+function chronoRewindSelf(state, p, a) {
+  const back = Math.round(((a.rewindSelf && a.rewindSelf.seconds) || 3) * 30);
+  const h = p._chronoHist;
+  if (!h || !h.length) return;
+  const past = h[Math.max(0, h.length - back)];
+  p.x = clamp(past.x, PLAYER_RADIUS, ARENA.width - PLAYER_RADIUS);
+  p.y = clamp(past.y, PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
+  p.hp = Math.max(p.hp, Math.min(p.maxHp, past.hp)); // 取較高血量
+  addFx(state, { type: 'blink', x: p.x, y: p.y, color: a.color, life: 0.45, radius: 80, vfx: a.vfx });
+}
+
 // 開始蔀力 (chargeMax 技能: 均不打出，只記錄撇)
 function tryStartCharge(p, a, slot) {
   if (p.chargeState) return; // 已在蔀力另一個技能，否戙
@@ -450,7 +514,13 @@ function tryAction(state, p, slot) {
   if (!freeMana && a.manaCost) p.mana -= a.manaCost;
   if (a.hpCost) p.hp -= a.hpCost;
   p.cd[slot] = a.cd;
+  const t = c.talent;
+  // 武士居合之道：蔓勢已滿則本次攻擊強化；非格擋類攻擊重置蔓勢計時
+  if (t && t.id === 'iaido' && !a.noIaiReset) { p.iaiReady = p.iaiTimer >= (t.delay || 2); p.iaiTimer = 0; }
   executeAction(state, p, a);
+  p.iaiReady = false;
+  // 時空術士時間棱鏡：施放技能(非基本攻擊)後加速
+  if (t && t.id === 'timeprism' && slot !== 'basic') applyEffect(p, 'haste', { duration: t.duration || 1.5, factor: t.factor || 1.25 });
 }
 
 // 大絕招：需能量槽滿槽。不耗 mana/hp，改消耗能量。
@@ -466,7 +536,11 @@ function tryUltimate(state, p) {
     if (!freeMana) p.ult = 0;
   }
   p.cd.ultimate = a.cd || ULT_LOCKOUT;
+  const t = c.talent;
+  if (t && t.id === 'iaido') { p.iaiReady = p.iaiTimer >= (t.delay || 2); p.iaiTimer = 0; }
   executeAction(state, p, a, { silent: true });
+  p.iaiReady = false;
+  if (t && t.id === 'timeprism') applyEffect(p, 'haste', { duration: t.duration || 1.5, factor: t.factor || 1.25 });
   // 單一大招施放特效 (螢幕級華麗表現由 vfx onCast 處理)
   addFx(state, { type: 'ultimate', x: p.x, y: p.y, facing: p.facing, color: a.color, life: 0.7, radius: a.radius || 140, vfx: a.vfx });
 }
@@ -624,10 +698,12 @@ function updateZones(state, dt) {
         if (isEnemy(state, z.owner, o)) {
           if (z.dmg) dealDamage(state, o, z.dmg, z.owner);
           if (z.effect) applyEffectFrom(state, o, z.effect, z.owner);
+          if (z.effects) for (const e of z.effects) applyEffectFrom(state, o, e, z.owner); // 多重 debuff (咒術師衰弱領域/時停)
           if (z.knockback) { const dx = o.x - z.x, dy = o.y - z.y, d = Math.hypot(dx, dy) || 1; o.kvx += dx / d * z.knockback; o.kvy += dy / d * z.knockback; }
           hits++;
-        } else if (z.allyHeal && isAlly(state, z.owner, o)) {
-          o.hp = Math.min(o.maxHp, o.hp + z.allyHeal); // 友方光環持續回血 (含自己)
+        } else if (isAlly(state, z.owner, o)) {
+          if (z.allyHeal) o.hp = Math.min(o.maxHp, o.hp + z.allyHeal); // 友方光環持續回血 (含自己)
+          if (z.allyEffect) applyEffect(o, z.allyEffect.kind, z.allyEffect, z.owner); // 友方光環增益 (加速等)
         }
       }
       // 範圍汲取：依命中敵數回復擁有者 (治療師大招)
@@ -648,7 +724,7 @@ function updateFx(state, dt) {
 
 function checkWin(state) {
   if (state.phase !== 'playing') return;
-  const alive = Object.values(state.players).filter((p) => p.alive);
+  const alive = Object.values(state.players).filter((p) => p.alive && !p.ownerId); // 排除召喚物 (不計入勝負陣營)
   // 存活「陣營」數：team>0 以隊伍號計，team 0 (單人) 各自為一方
   const sides = new Set();
   for (const p of alive) sides.add(p.team > 0 ? 't' + p.team : 'p' + p.id);
@@ -744,6 +820,15 @@ function processTrail(state, p, dt) {
   if (tr.remaining <= 0) p.trail = null;
 }
 
+// 死靈法師天賦亡者之觸：自身造成的 DoT 每跳回復等量比例生命。
+function dotLifesteal(state, srcId, dmg) {
+  if (srcId == null || !dmg) return;
+  const src = state.players[srcId];
+  if (!src || !src.alive) return;
+  const t = getCharacter(src.charId).talent;
+  if (t && t.id === 'undeath') src.hp = Math.min(src.maxHp, src.hp + dmg * (t.factor || 0.4));
+}
+
 // 一個固定步的權威模擬
 export function step(state, inputs, dt) {
   if (state.phase !== 'playing') return;
@@ -751,12 +836,24 @@ export function step(state, inputs, dt) {
 
   for (const p of Object.values(state.players)) {
     if (!p.alive) continue;
+    // 玩家召喚物到期消散
+    if (p.summonLife > 0) { p.summonLife -= dt; if (p.summonLife <= 0) { p.alive = false; addFx(state, { type: 'death', x: p.x, y: p.y, color: '#9b8cff', life: 0.4, radius: PLAYER_RADIUS * 1.6 }); continue; } }
     let input = inputs[p.id] || EMPTY_INPUT;
-    // 魔王/召喚物/镜像：以 AI 計算輸入取代鍵盤 (僅 fighting 階段行動；host-only 運算)
-    if (p.aiId && state.mode === 'boss') {
-      input = state.roundPhase === 'fighting' ? computeBossInput(state, p, dt) : EMPTY_INPUT;
+    // 魔王/召喚物/镳像：以 AI 計算輸入取代鍵盤 (host-only 運算)
+    if (p.aiId) {
+      if (state.mode === 'boss') input = state.roundPhase === 'fighting' ? computeBossInput(state, p, dt) : EMPTY_INPUT;
+      else input = computeBossInput(state, p, dt); // FFA 召喚物 AI
     }
     const talent = getCharacter(p.charId).talent;
+    // 時空術士：記錄位置/血量歷史 (供大招時空逆轉回溯)
+    const _uc = getCharacter(p.charId).ultimate;
+    if (_uc && _uc.rewindSelf) {
+      if (!p._chronoHist) p._chronoHist = [];
+      p._chronoHist.push({ x: p.x, y: p.y, hp: p.hp });
+      if (p._chronoHist.length > 130) p._chronoHist.shift();
+    }
+    // 武士居合之道：未攻擊時累計蔓勢計時 (攻擊時於 tryAction 重置)
+    if (talent && talent.id === 'iaido') p.iaiTimer = (p.iaiTimer || 0) + dt;
 
     // 攻速天賦 (狂戰士嗜血狂暴：殘血加速冷卻回復)
     let cdRate = 1;
@@ -771,11 +868,11 @@ export function step(state, inputs, dt) {
       e.remaining -= dt;
       if (kind === 'burn') {
         e.tickTimer -= dt;
-        if (e.tickTimer <= 0) { e.tickTimer += e.tick; dealDamage(state, p, e.dmg, e.srcId); addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#ff6b3d', life: 0.3, radius: PLAYER_RADIUS }); }
+        if (e.tickTimer <= 0) { e.tickTimer += e.tick; dealDamage(state, p, e.dmg, e.srcId); dotLifesteal(state, e.srcId, e.dmg); addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#ff6b3d', life: 0.3, radius: PLAYER_RADIUS }); }
       } else if (kind === 'bleed') {
         const moving = (Math.abs(p.vx) + Math.abs(p.vy)) > 1; // 移動中流血加速 (用上一 tick 速度)
         e.tickTimer -= dt * (moving ? e.moveMult : 1);
-        if (e.tickTimer <= 0) { e.tickTimer += e.tick; dealDamage(state, p, e.dmg, e.srcId); addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#e84141', life: 0.3, radius: PLAYER_RADIUS }); }
+        if (e.tickTimer <= 0) { e.tickTimer += e.tick; dealDamage(state, p, e.dmg, e.srcId); dotLifesteal(state, e.srcId, e.dmg); addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#e84141', life: 0.3, radius: PLAYER_RADIUS }); }
       } else if (kind === 'chill') {
         if (e.stacks >= e.max && !e.froze) {
           e.froze = true;
@@ -803,16 +900,6 @@ export function step(state, inputs, dt) {
     const scripted = processScripted(state, p, dt); // 衝鋒/躍擊進行中接管移動
     if (!scripted) {
       applyMovement(p, input, dt);
-
-      // 煙遁天賦 (忍者)：靜止一段時間自動短隱身
-      if (talent && talent.id === 'smoke') {
-        const moving = (Math.abs(p.vx) + Math.abs(p.vy)) > 1;
-        if (moving) p.still = 0; else p.still += dt;
-        if (p.still >= (talent.delay || 1.5)) {
-          const cur = p.effects.invis;
-          if (!cur || cur.remaining < (talent.linger || 0.5)) applyEffect(p, 'invis', { duration: talent.linger || 0.5, speed: 1.0 });
-        }
-      }
 
       processTrail(state, p, dt); // 移動留痕 (冰霜足跡)
 
@@ -850,6 +937,11 @@ export function step(state, inputs, dt) {
   updateProjectiles(state, dt);
   updateZones(state, dt);
   updateFx(state, dt);
+  // 清除已死亡的玩家召喚物 (避免累積；一般玩家死亡保留供結算)
+  for (const id of Object.keys(state.players)) {
+    const o = state.players[id];
+    if (o.isSummon && !o.alive) delete state.players[id];
+  }
   if (state.mode === 'boss') { bossTick(state, dt); checkBossRound(state, dt); }
   else checkWin(state);
 }

@@ -393,3 +393,26 @@ registerVfx('ninja_bind', {
   }
 });
 
+// 影襲瞬移落點的緩速煙幕地帶 (skill2 leaveZone)
+registerVfx('ninja_smoke', {
+  zone(ctx, z) {
+    const TH = ctx.THREE;
+    const R = z.radius || 120;
+    const geo = new TH.CircleGeometry(R, 26);
+    const mat = new TH.MeshBasicMaterial({ color: 0x5a6472, transparent: true, opacity: 0.34, depthWrite: false, side: TH.DoubleSide });
+    const disc = new TH.Mesh(geo, mat); disc.rotation.x = -Math.PI / 2; disc.position.y = 1.2;
+    const g = new TH.Group(); g.add(disc);
+    g.userData.geo = geo; g.userData.mat = mat;
+    let first = true;
+    return {
+      object3D: g,
+      update() {
+        if (first) { first = false; const cc = { x: g.position.x, y: 6, z: g.position.z }; burst(ctx, cc, { color: ['#9aa4b2', '#5a6472', '#2c3e50'], count: 24, speed: 130, up: 30, drag: 1.6, life: 0.6, size: 6 }); }
+        mat.opacity = 0.28 + 0.08 * Math.sin(performance.now() / 150);
+        if (Math.random() < 0.5) { const a = Math.random() * Math.PI * 2, rr = Math.random() * R; ctx.particles.spawn({ x: g.position.x + Math.cos(a) * rr, y: 4, z: g.position.z + Math.sin(a) * rr, vx: (Math.random() - 0.5) * 18, vy: 14 + Math.random() * 22, vz: (Math.random() - 0.5) * 18, drag: 1.4, life: 0.8, size: 6, color: '#8a93a3', fade: true }); }
+      },
+    };
+  },
+});
+
+

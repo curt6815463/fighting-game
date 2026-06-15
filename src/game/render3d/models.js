@@ -21,6 +21,14 @@ import { buildBerserker } from './classes/berserker.js';
 import { buildNinja } from './classes/ninja.js';
 import { buildElementalist } from './classes/elementalist.js';
 import { buildFighter } from './classes/fighter.js';
+import { buildPaladin } from './classes/paladin.js';
+import { buildHexer } from './classes/hexer.js';
+import { buildBard } from './classes/bard.js';
+import { buildSamurai } from './classes/samurai.js';
+import { buildGunslinger } from './classes/gunslinger.js';
+import { buildSummoner } from './classes/summoner.js';
+import { buildNecromancer } from './classes/necromancer.js';
+import { buildChronomancer } from './classes/chronomancer.js';
 import { buildDefault } from './classes/default.js';
 
 // 原型設定：bulk(體型) / weapon(武器) / 顏色由角色資料 color 決定
@@ -35,6 +43,14 @@ const ARCHE = {
   7: { bulk: 1.64, weapon: 'kunai' },     // 忍者
   8: { bulk: 2.0, weapon: 'elements', robe: true }, // 元素使
   9: { bulk: 2.1, weapon: 'gloves' },    // 格鬥家
+  10: { bulk: 2.5, weapon: 'warhammer' },          // 聖騎士
+  11: { bulk: 1.82, weapon: 'hexstaff', robe: true }, // 咒術師
+  12: { bulk: 1.74, weapon: 'lute' },              // 吟遊詩人
+  13: { bulk: 2.04, weapon: 'katana' },            // 武士
+  14: { bulk: 1.8, weapon: 'dualguns' },           // 槍手
+  15: { bulk: 1.92, weapon: 'summonorb', robe: true }, // 召喚師
+  16: { bulk: 1.92, weapon: 'scythe', robe: true },  // 死靈法師
+  17: { bulk: 1.86, weapon: 'clockstaff', robe: true }, // 時空術士
 };
 
 function shade(hex, f) {
@@ -58,12 +74,16 @@ function mat(color, opt = {}) {
 const SKIN_KIND = {
   0: 'metal', 1: 'cloth', 2: 'leather', 3: 'metal', 4: 'leather',
   5: 'cloth', 6: 'metal', 7: 'leather', 8: 'cloth', 9: 'skin',
+  10: 'metal', 11: 'cloth', 12: 'cloth', 13: 'metal', 14: 'leather',
+  15: 'cloth', 16: 'cloth', 17: 'cloth',
 };
 const HEADGEAR = {
   0: 'helm', 1: 'hat', 2: 'hood', 3: 'helm', 4: 'hood',
   5: 'hood', 6: 'horns', 7: 'mask', 8: 'hood', 9: 'band',
+  10: 'helm', 11: 'hood', 12: 'hat', 13: 'helm', 14: 'hat',
+  15: 'hood', 16: 'hood', 17: 'hood',
 };
-const PAULDRONS = new Set([0, 3, 6]); // 重甲系加肩甲
+const PAULDRONS = new Set([0, 3, 6, 10, 13]); // 重甲系加肩甲
 
 // 以 canvas 程序生成表面貼圖 (依識別色 + 質感樣式)，快取避免重複建立。
 const _texCache = new Map();
@@ -322,6 +342,30 @@ export function createCharacterModel(charId) {
       break;
     case 9:
       parts = buildFighter(ctx);
+      break;
+    case 10:
+      parts = buildPaladin(ctx);
+      break;
+    case 11:
+      parts = buildHexer(ctx);
+      break;
+    case 12:
+      parts = buildBard(ctx);
+      break;
+    case 13:
+      parts = buildSamurai(ctx);
+      break;
+    case 14:
+      parts = buildGunslinger(ctx);
+      break;
+    case 15:
+      parts = buildSummoner(ctx);
+      break;
+    case 16:
+      parts = buildNecromancer(ctx);
+      break;
+    case 17:
+      parts = buildChronomancer(ctx);
       break;
     default:
       parts = buildDefault(ctx);
@@ -635,6 +679,76 @@ function buildWeapon(hand, type, base, reg) {
         const o = add(funnel, 4, 0, 0);
         o.userData.orbit = i;
       }
+      break;
+    }
+    case 'warhammer': { // 聖騎士：黃金聖光戰錘
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 46, 8), dark), 3, -6, 0); // 長柄
+      add(new THREE.Mesh(new THREE.BoxGeometry(13, 14, 13), steel), 3, 18, 0);          // 錘頭
+      add(new THREE.Mesh(new THREE.BoxGeometry(14, 4.5, 4.5), gold), 3, 18, 0);         // 金箍十字
+      add(new THREE.Mesh(new THREE.BoxGeometry(4.5, 14, 4.5), gold), 3, 18, 0);
+      add(new THREE.Mesh(new THREE.IcosahedronGeometry(3.2, 0), accent), 3, 18, 0);     // 發光聖光核心
+      add(new THREE.Mesh(new THREE.ConeGeometry(2.2, 8, 6), gold), 3, 27.5, 0);         // 頂尖
+      break;
+    }
+    case 'hexstaff': { // 咒術師：詛咒法杖 (骷髏 + 紫晶)
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 52, 8), dark), 3, -2, 0);
+      add(new THREE.Mesh(new THREE.IcosahedronGeometry(4.4, 0), reg(mat(0xe8e2d0, { rough: 0.5 }))), 3, 26, 0); // 骷髏(近似)
+      add(new THREE.Mesh(new THREE.TorusGeometry(6.2, 0.8, 6, 18), accent), 3, 26, 0, Math.PI / 2, 0, 0);       // 環繞符環
+      const hexGem = add(new THREE.Mesh(new THREE.OctahedronGeometry(3.2, 0), accent), 3, 33.5, 0);
+      hexGem.userData = { glow: true };
+      break;
+    }
+    case 'lute': { // 吟遊詩人：魯特琴
+      const woodMat = reg(mat(0x8a5a2b, { rough: 0.6, metal: 0.1 }));
+      add(new THREE.Mesh(new THREE.SphereGeometry(7, 14, 10, 0, Math.PI * 2, 0, Math.PI / 2), woodMat), 3, 0, 0, Math.PI, 0, 0); // 琴身(半球)
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 22, 8), woodMat), 3, 13, 0);  // 琴頸
+      add(new THREE.Mesh(new THREE.BoxGeometry(3, 4, 2.2), dark), 3, 25, 0);                 // 琴頭
+      add(new THREE.Mesh(new THREE.TorusGeometry(2.5, 0.4, 6, 16), gold), 4.4, 1, 0, Math.PI / 2, 0, 0); // 音孔
+      for (let i = -1; i <= 1; i++) add(new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 22, 4), accent), 4.2, 13, i * 1.2); // 琴弦發光
+      break;
+    }
+    case 'katana': { // 武士：緋紅太刀
+      add(new THREE.Mesh(new THREE.BoxGeometry(1.4, 50, 3.6), accent), 3, 18, 0);   // 刀身(發光刃)
+      add(new THREE.Mesh(new THREE.BoxGeometry(2.2, 50, 1.2), steel), 3, 18, 0);    // 刀脊
+      add(new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 1.2, 4), gold), 3, -6, 0, 0, Math.PI / 4, 0); // 鍔(方形護手)
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 12, 8), dark), 3, -12, 0); // 柄
+      break;
+    }
+    case 'dualguns': { // 槍手：雙重型手槍
+      const gunMat = reg(mat(0x4a4a4a, { metal: 0.85, rough: 0.25 }));
+      for (const sz of [-1, 1]) {
+        add(new THREE.Mesh(new THREE.BoxGeometry(14, 4, 2.4), gunMat), 6, 0, sz * 3.4);     // 槍管朝前(+X)
+        add(new THREE.Mesh(new THREE.BoxGeometry(4, 7, 2.2), dark), 1, -3.5, sz * 3.4);     // 握把
+        add(new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 2.8), accent), 12.8, 0.4, sz * 3.4); // 槍口發光
+        add(new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 2.0, 8), gold), 3, 0.4, sz * 3.4, Math.PI / 2, 0, 0); // 轉輪
+      }
+      break;
+    }
+    case 'summonorb': { // 召喚師：浮空魔導書 + 環繞靈球
+      const bookMat = reg(mat(0x0e6b5a, { rough: 0.5, metal: 0.2 }));
+      add(new THREE.Mesh(new THREE.BoxGeometry(3, 9, 11), bookMat), 4, 2, 0);             // 書本
+      add(new THREE.Mesh(new THREE.BoxGeometry(2.2, 8, 9.6), reg(mat(0xeafff8, { emissive: 0x4fe0c0, ei: 1.2 }))), 5, 2, 0); // 書頁發光
+      for (let i = 0; i < 3; i++) { // 三顆環繞靈球 (animateModel 依 orbit 公轉)
+        const orb = new THREE.Mesh(new THREE.IcosahedronGeometry(2.0, 0), accent);
+        orb.castShadow = true; orb.position.set(4, 2, 0); hand.add(orb);
+        orb.userData.orbit = i;
+      }
+      break;
+    }
+    case 'scythe': { // 死靈法師：死神鐮刀
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, 56, 8), dark), 3, -2, 0);  // 長桿
+      add(new THREE.Mesh(new THREE.TorusGeometry(13, 1.5, 6, 20, Math.PI * 0.9), accent), 3, 26, 0, 0, 0, Math.PI * 0.1); // 彎曲鐮刃(發光)
+      add(new THREE.Mesh(new THREE.TorusGeometry(13, 0.6, 6, 20, Math.PI * 0.9), steel), 3.4, 26, 0, 0, 0, Math.PI * 0.1);
+      add(new THREE.Mesh(new THREE.IcosahedronGeometry(2.6, 0), accent), 3, 27, 0);      // 連接處幽綠寶石
+      break;
+    }
+    case 'clockstaff': { // 時空術士：時鐘法杖
+      add(new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 50, 8), reg(mat(0x2b6c78, { metal: 0.6, rough: 0.3 }))), 3, -3, 0); // 杖身
+      add(new THREE.Mesh(new THREE.TorusGeometry(7, 1.0, 8, 24), gold), 3, 25, 0, Math.PI / 2, 0, 0);  // 鐘環
+      add(new THREE.Mesh(new THREE.CircleGeometry(6, 20), reg(mat(0xeafdff, { emissive: 0x4dd0e1, ei: 1.4 }))), 3.4, 25, 0, 0, -Math.PI / 2, 0); // 鐘面(發光)
+      const clkHand = add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 5, 0.4), accent), 3.7, 25, 0);    // 長指針
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.8, 3.4, 0.4), accent), 3.7, 25, 0, 0, 0, Math.PI / 2); // 短指針
+      clkHand.userData = { glow: true };
       break;
     }
     default:
