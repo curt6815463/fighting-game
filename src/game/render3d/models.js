@@ -455,7 +455,15 @@ function driveSkin(ud, dt, info) {
         const timeScale = Math.max(0.4, Math.min(2.2, info.speed / baseSpeed));
         act.setEffectiveTimeScale(timeScale);
       } else {
-        act.setEffectiveTimeScale(1.0);
+        // 如果 idle clip 和 walk/run 是同一個 clip（boss FBX fallback），
+        // idle 時把 timeScale 設為 0 讓動畫凍結，避免「原地跑步」的視覺問題。
+        const sameAsWalk = s.actions.walk && s.actions.walk === act;
+        const sameAsRun = s.actions.run && s.actions.run === act;
+        if (sameAsWalk || sameAsRun) {
+          act.setEffectiveTimeScale(0);
+        } else {
+          act.setEffectiveTimeScale(1.0);
+        }
       }
     }
   }
