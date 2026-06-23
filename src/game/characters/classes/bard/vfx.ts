@@ -60,7 +60,30 @@ registerVfx('bard_discord', {
     }
     g.userData.geo = { dispose: () => geos.forEach((x) => x.dispose()) };
     g.userData.mat = mat;
-    return { object3D: g, update() {} };
+    return {
+      object3D: g,
+      update(dt) {
+        // Sonic vibration: oscillate scale and add a subtle wobble
+        const freq = performance.now() * 0.035;
+        g.scale.set(1.0, 1.0 + 0.12 * Math.sin(freq), 1.0 + 0.12 * Math.cos(freq));
+        
+        if (Math.random() < 0.45) {
+          ctx.particles.spawn({
+            x: g.position.x + (Math.random() - 0.5) * pr.radius * 0.4,
+            y: g.position.y + (Math.random() - 0.5) * pr.radius * 0.4,
+            z: g.position.z + (Math.random() - 0.5) * pr.radius * 0.4,
+            vx: -pr.vx * 0.12 + (Math.random() - 0.5) * 30,
+            vy: (Math.random() - 0.5) * 30,
+            vz: -pr.vy * 0.12 + (Math.random() - 0.5) * 30,
+            life: 0.38,
+            size: pr.radius * 0.28,
+            color: Math.random() < 0.6 ? '#ff4081' : '#ffd76a',
+            drag: 1.6,
+            fade: true
+          });
+        }
+      }
+    };
   },
   onHit(ctx, f, c) {
     sphereFlash(ctx, c, { color: ROSE, from: 5, to: 40, life: 0.24, alpha: 0.9 });
@@ -95,6 +118,122 @@ registerVfx('bard_ultimate', {
       note.userData.geo = geo; note.userData.mat = mat;
     }
   },
+  zone(ctx, z) {
+    const THREE = ctx.THREE;
+    const g = new THREE.Group();
+    const R = z.radius || 250;
+    const color = new THREE.Color(z.color || '#ff4081');
+    const geos = [];
+    const mats = [];
+
+    // 1. 地面雙重聲波波紋
+    const ringGeo = new THREE.RingGeometry(R * 0.95, R, 32);
+    const ringMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+    ringMesh.rotation.x = -Math.PI / 2;
+    ringMesh.position.y = 1.1;
+    g.add(ringMesh);
+    geos.push(ringGeo);
+    mats.push(ringMat);
+
+    const innerRingGeo = new THREE.RingGeometry(R * 0.48, R * 0.5, 32);
+    const innerRingMesh = new THREE.Mesh(innerRingGeo, ringMat);
+    innerRingMesh.rotation.x = -Math.PI / 2;
+    innerRingMesh.position.y = 1.15;
+    g.add(innerRingMesh);
+    geos.push(innerRingGeo);
+
+    // 2. 旋轉音符球體
+    const noteGeo = new THREE.SphereGeometry(4, 8, 6);
+    geos.push(noteGeo);
+    const noteCols = [0xff4081, 0xffd76a, 0xff8fb8];
+    const notes = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (i / 6) * Math.PI * 2;
+      const noteMat = new THREE.MeshStandardMaterial({
+        color: noteCols[i % noteCols.length],
+        emissive: noteCols[i % noteCols.length],
+        emissiveIntensity: 2.2,
+        roughness: 0.3,
+        transparent: true,
+        opacity: 0.8
+      });
+      mats.push(noteMat);
+      const nm = new THREE.Mesh(noteGeo, noteMat);
+      g.add(nm);
+      notes.push({ mesh: nm, angle, radius: R * (0.3 + 0.6 * (i / 6)), height: 6 + Math.random() * 12, speed: 1.8 + Math.random() * 1.2 });
+    }
+
+    // 3. 中央旋轉音律光柱 (酷炫炫彩光環/光柱效果)
+    const pillarGeo = new THREE.CylinderGeometry(18, 24, 150, 16, 1, true);
+    const pillarMat = new THREE.MeshBasicMaterial({
+      color: 0xff4081,
+      transparent: true,
+      opacity: 0.35,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const pillarMesh = new THREE.Mesh(pillarGeo, pillarMat);
+    pillarMesh.position.y = 75;
+    g.add(pillarMesh);
+    geos.push(pillarGeo);
+    mats.push(pillarMat);
+
+    g.userData.geo = { dispose: () => geos.forEach(geo => geo.dispose()) };
+    g.userData.mat = { dispose: () => mats.forEach(mat => mat.dispose()) };
+
+    let age = 0;
+    let timeAcc = 0;
+    return {
+      object3D: g,
+      update(dt) {
+        age += dt;
+        ringMesh.rotation.z = age * 0.45;
+        innerRingMesh.rotation.z = -age * 0.6;
+
+        notes.forEach((n) => {
+          n.angle += dt * n.speed;
+          const curR = n.radius * (0.95 + 0.05 * Math.sin(age * 2.5 + n.angle));
+          n.mesh.position.set(Math.cos(n.angle) * curR, n.height + Math.sin(age * 3.5 + n.angle) * 3, Math.sin(n.angle) * curR);
+        });
+
+        // 光柱旋轉與微幅呼吸脈動
+        pillarMesh.rotation.y += dt * 1.6;
+        pillarMesh.scale.x = 1.0 + 0.12 * Math.sin(age * 6.5);
+        pillarMesh.scale.z = 1.0 + 0.12 * Math.sin(age * 6.5);
+
+        const remaining = Math.max(0, z.lifetime / (age + z.lifetime));
+        ringMat.opacity = 0.5 * remaining * (0.7 + 0.3 * Math.sin(age * 5));
+        pillarMat.opacity = 0.35 * remaining * (0.85 + 0.15 * Math.sin(age * 12));
+        mats.forEach((mat) => {
+          if (mat !== ringMat && mat !== pillarMat) mat.opacity = 0.8 * remaining;
+        });
+
+        // 持續產生由內向外擴散的金色/粉色粒子流
+        timeAcc += dt;
+        const rate = 0.035; // 更密集的粒子
+        while (timeAcc >= rate) {
+          timeAcc -= rate;
+          const angle = Math.random() * Math.PI * 2;
+          const dist = Math.random() * R * 0.35; // 從中內部起跑
+          ctx.particles.spawn({
+            x: g.position.x + Math.cos(angle) * dist,
+            y: 3,
+            z: g.position.z + Math.sin(angle) * dist,
+            vx: Math.cos(angle) * (150 + Math.random() * 150), // 向外推開的粒子速度
+            vy: 70 + Math.random() * 100,
+            vz: Math.sin(angle) * (150 + Math.random() * 150),
+            drag: 0.85,
+            life: 0.6 + Math.random() * 0.35,
+            size: 3.5 + Math.random() * 3.5,
+            color: Math.random() < 0.65 ? '#ff4081' : '#ffd76a',
+            fade: true
+          });
+        }
+      }
+    };
+  }
 });
 
 registerVfx('bard_anthem_ally', {
@@ -131,3 +270,12 @@ registerVfx('bard_ultimate_ally', {
     }
   }
 });
+
+registerVfx('bard_heal_hit', {
+  onHit(ctx, f, c) {
+    sphereFlash(ctx, c, { color: '#5cffa6', from: 4, to: 28, life: 0.25, alpha: 0.85 });
+    ring(ctx, c, { color: '#ff8fb8', from: 4, to: 35, life: 0.3, y: 6 });
+    burst(ctx, c, { color: ['#5cffa6', '#ff8fb8', '#ffffff'], count: 8, speed: 120, life: 0.35, size: 2.8 });
+  }
+});
+

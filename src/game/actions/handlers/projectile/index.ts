@@ -28,6 +28,7 @@ export function projectile(ctx: ActionContext) {
       leaveZone: action.leaveZone,
       freezeBonus: action.freezeBonus || 0,
       vfx: projVfx,
+      heal: (action as any).heal,
     }));
   }
 }

@@ -3,7 +3,8 @@ import { clamp, dist, angleDiff } from '../entities/math.ts';
 import { makeProjectile, makeZone } from '../entities/factories.ts';
 import { dealDamage } from '../entities/damage.ts';
 import { addFx } from '../entities/fx.ts';
-import { isEnemy } from '../entities/team.ts';
+import { isEnemy, isAlly } from '../entities/team.ts';
+import { applyHeal } from '../entities/heal.ts';
 import { applyEffectFrom, bodyR } from '../actions/combat.ts';
 import { checkProjectileHit, damageDestructible } from './destructibles.ts';
 import type { GameState, Projectile, Player } from '../types';
@@ -75,6 +76,25 @@ export function updateProjectiles(state: GameState, dt: number) {
 
     let dead = false;
     for (const o of Object.values(state.players)) {
+      if (!o.alive) continue;
+
+      // Heal allies if projectile has a heal value and hits an ally (and hasn't hit them yet)
+      if (projectile.heal && isAlly(state, projectile.owner, o) && !projectile.hit[o.id]) {
+        if (dist(projectile.x, projectile.y, o.x, o.y) <= projectile.radius + bodyR(o)) {
+          applyHeal(state, o, projectile.heal, { burst: true });
+          projectile.hit[o.id] = true;
+          addFx(state, {
+            type: 'hit',
+            x: o.x,
+            y: o.y,
+            color: '#5cffa6',
+            life: 0.25,
+            radius: o.hitR * 1.5,
+            vfx: 'bard_heal_hit'
+          });
+        }
+      }
+
       if (!isEnemy(state, projectile.owner, o) || projectile.hit[o.id]) continue;
       if (dist(projectile.x, projectile.y, o.x, o.y) <= projectile.radius + bodyR(o)) {
         const hitDmg = projectile.freezeBonus && o.effects && o.effects.stun

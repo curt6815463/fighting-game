@@ -123,6 +123,7 @@ export function makeProjectile(owner: EntityId, x: number, y: number, vx: number
     leaveZone: opt.leaveZone || null,
     freezeBonus: opt.freezeBonus || 0,
     vfx: opt.vfx || null,
+    heal: opt.heal || 0,
     hit: {},
   };
 }
