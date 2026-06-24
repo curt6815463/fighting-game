@@ -29,6 +29,7 @@ import { CHARACTERS } from './characters.js';
 import { getBossForRound } from './bosses.js';
 import { startBossRound, retryBossRound, quitBossRun } from './bossMode.js';
 import { step, applyMovement } from './simulation.ts';
+import { serializeNetworkSnapshot } from './network/snapshot';
 import { DT, SNAPSHOT_INTERVAL, INPUT_INTERVAL, MAX_PLAYERS } from './constants.js';
 import type {
   ControllerEvents,
@@ -40,42 +41,9 @@ import type {
   LobbyView,
 } from '../types';
 
-export function serializeNetworkPlayer(p: any) {
-  return {
-    id: p.id, name: p.name, charId: p.charId,
-    x: p.x, y: p.y, facing: p.facing, kvx: p.kvx, kvy: p.kvy,
-    hp: p.hp, maxHp: p.maxHp, mana: p.mana, maxMana: p.maxMana,
-    alive: p.alive, shield: p.shield, shieldTime: p.shieldTime, kills: p.kills,
-    effects: p.effects, cd: p.cd, ult: p.ult, team: p.team, chargeState: p.chargeState,
-    // 魔王/召喚物/部位渲染旗標
-    isBoss: p.isBoss, isPart: p.isPart, isMinion: p.isMinion, isFake: p.isFake, isMirror: p.isMirror,
-    ownerId: p.ownerId, partId: p.partId, partColor: p.partColor, scale: p.scale, reviveProg: p.reviveProg,
-    // HUD/渲染額外線索：破綻窗口、相位機制覆寫、倒地判定 (aiId)、引導光束 (channel)
-    aiId: p.aiId, channel: p.channel, recoverWindow: p.recoverWindow, recoverHeavy: p.recoverHeavy,
-    phaseTagsOverride: p.phaseTagsOverride,
-  };
-}
-
-export function serializeNetworkSnapshot(state: any) {
-  const players: Record<string, any> = {};
-  for (const id of Object.keys(state.players)) players[id] = serializeNetworkPlayer(state.players[id]);
-  return {
-    phase: state.phase, winner: state.winner, winnerTeam: state.winnerTeam, time: state.time,
-    mode: state.mode, round: state.round, bossId: state.bossId,
-    bossHp: state.bossHp, bossMaxHp: state.bossMaxHp,
-    roundPhase: state.roundPhase, roundTimer: state.roundTimer, introDur: state.introDur,
-    banner: state.banner, tethers: state.tethers, bossWipedRound: state.bossWipedRound,
-    // 全滅面板只需要重打次數；不送整包 stats (會持續累積、且只在結算才完整用到)
-    stats: state.stats ? { _retryCount: state.stats._retryCount || 0 } : null,
-    players,
-    // 投射物/區域/特效/可破壞物仍是渲染必需，原樣帶上 (數量少、生命短)
-    projectiles: state.projectiles, zones: state.zones, fx: state.fx,
-    destructibles: state.destructibles || [],
-    items: state.items || [],
-    timeAnchors: state.timeAnchors || [],
-    timeAnchorRitual: state.timeAnchorRitual || null,
-  };
-}
+// 網路快照序列化已抽到 ./network/snapshot.ts（宣告式欄位 manifest）。
+// 此處 re-export 維持既有引用點（含 test/networkSnapshot.test.ts）不需改動。
+export { serializeNetworkPlayer, serializeNetworkSnapshot } from './network/snapshot';
 
 // ---------- 加入者效能量測 (?perf=1) ----------
 // 量化加入者卡頓來源：每包大小 (含 fx / projectiles 佔比)、反序列化處理、buildView 插值耗時、
