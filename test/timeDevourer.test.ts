@@ -151,10 +151,10 @@ describe('Round 11 temporal echoes', () => {
 });
 
 describe('Round 11 falling clock hands', () => {
-  it('uses four persistent delayed zones without windup fx spam or custom zone geometry', () => {
+  it('uses persistent delayed zones without windup fx spam or custom zone geometry', () => {
     const { state, boss } = setup(1);
     const skill = getCharacter(110).skill2;
-    expect(skill.count).toBe(4);
+    expect(skill.count).toBe(6);
     expect(skill.delay).toBeGreaterThan(0);
     expect(skill.suppressWindupTelegraph).toBe(true);
     expect(skill.vfx).toBeUndefined();
