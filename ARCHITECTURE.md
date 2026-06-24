@@ -422,13 +422,14 @@ yarn test:run     # determinism 黃金快照 + registry 不變式，必須全綠
 - ✅ **天賦 registry 補生命週期 hook**（`13f449c`）：除傷害管線外再加 `cooldownRate/onTimers/onRecovery/onCastResolved`，搬移 bloodlust(攻速)/lifebloom/iaido(計時)/timeprism。
 - ✅ **effect 顯示中繼資料 co-located**（`2f8eee6`）：`EFFECT_META`（icon/name/buff）併進 `EFFECT_DEFS`，`getEffectHud()` 取代 `hud.js` 的第二份表 → 新增效果只改一處。
 - ✅ **`hud.js` 硬編魔王特例**（`cb2f71a`）：`charId === 102` 改讀 lava-juggernaut 資料的 `lavaBurn` flag；引擎已無硬編魔王 id。
+- ✅ **HUD widget registry（種子）**（`3b659dc`）：建立 `render3d/hud/`（`dom.js` 共用工具 + `widgets.js` registry + `widgets/hazardAlert.js` 首個 widget）。新增 HUD 指示器＝加一個 widget 檔、`registerHudWidget`，不必動 `hud.js` 核心。已實機驗證渲染正常。
+- ✅ **移除死碼 render2d**（`f71f75c`）：經確認 `renderer.canvas2d.js` + `render2d/`（舊 Canvas2D 備援）已無引用，整包刪除（-7 檔）。
 
-**仍待處理 / 評估**
+**仍待處理 / 評估（低優先或屬大改動）**
 
-- **HUD widget registry（完整版）**：`render3d/hud.js`（仍逾千行）的角落面板/指示器尚未 registry 化；可仿 VFX 做 `registerHudWidget()`。effect 顯示已先 co-located（見上）。
-- **天賦剩餘 inline**：warsong/plague（aura）、summonbond 召喚物回主（跨實體）、pyromancy（強化 burn 效果）、undeath（DoT 汲取）、iaido 居合就緒（與施放序列緊密耦合）——需更專屬 hook，可增量搬移。
-- **`.js` 相容性 barrel 清理**：`characters.js`/`entities.js`/`bosses.js`/`constants.js` 等 re-export 殼，待引用點收斂後可移除（純清潔，無行為）。
-- **render2d 備援**：`renderer.canvas2d.js` + `render2d/` 為**刻意保留的備援參考**（README 明載），確認團隊不再需要前**不**逕行刪除。
+- **HUD widget registry（既有面板搬移）**：自身狀態/名牌/魔王/機制卡/全滅面板仍在 `hud.js` 的 `update()`；種子已就位，可增量把這些搬成 widget（DOM 重、無單測，建議搭配實機/截圖驗證）。
+- **天賦剩餘 inline 特例**：warsong/plague（aura）、summonbond 召喚物回主（跨實體）、pyromancy（強化 burn 效果）、undeath（DoT 汲取）、iaido 居合就緒（與施放序列緊密耦合）。這些屬「aura／跨實體／與序列緊密耦合」，需更專屬的 hook（如 aura 聚合、onAnyDeath、modifyAppliedEffect）；硬塞現有 hook 反增風險，建議「有需要時再配對應 hook 搬移」。
+- **`.js` 相容性 barrel 清理**：`characters.js`/`entities.js`/`bosses.js`/`constants.js` 等 re-export 殼，待引用點收斂後可移除（純清潔，無行為；牽動大量 import 路徑，價值低）。
 - **React API 面（`src/types.ts` 的 `GameController`）**：每加一個 controller 指令要同步改型別＋`App.tsx`；可評估事件/命令匯流排化，但屬較大改動，獨立評估。
 
 ---

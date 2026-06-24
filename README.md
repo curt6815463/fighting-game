@@ -185,6 +185,7 @@ src/
 | 狀態效果 | `entities/effects.ts` 的 `EFFECT_DEFS` | 加一筆 `{ apply, cleanseable, hud }`（淨化清單自動推導；`hud` 同檔提供狀態列圖示/名稱） |
 | 天賦 | `characters/talents/registry.ts` | 在角色 `talent.ts` 內 `registerTalent('<id>', { ...hooks })`（傷害管線 + 生命週期 hook） |
 | 角色 VFX | `render3d/vfx/registry.js` | 在角色 `vfx.ts` 內 `registerVfx('<id>', { onCast, … })` |
+| HUD widget | `render3d/hud/widgets.js` | 在 `render3d/hud/widgets/<name>.js` 內 `registerHudWidget({ id, mount, update })` |
 | 網路同步欄位 | `network/snapshot.ts` 的 `NET_PLAYER_FIELDS` / `NET_STATE_FIELDS` | 在欄位陣列 append 一行（宣告式 manifest，避免漏接 desync） |
 
 ### 型別與測試
@@ -204,6 +205,7 @@ src/
 - **新增一個天賦（被動）**：天賦資料寫在角色 `data.talent`（`{ id, name, desc, ...參數 }`）。邏輯在角色資料夾建 `talent.ts`，`registerTalent('<id>', { ...hooks })`，並在該角色 `index.ts` 加 `import './talent.ts'`（side-effect 註冊，仿 `vfx.ts`）。可用 hook：傷害管線 `modifyOutgoing/modifyIncoming/onDealt/onAttacked`、生命週期 `cooldownRate/onTimers/onRecovery/onCastResolved`——涵蓋多數天賦，**不必再改 `damage.ts`/`playerState.ts`/`casting.ts`**。少數 aura/跨實體/與施放序列緊密耦合者（warsong、plague、pyromancy、undeath、iaido 居合就緒）仍內聯，進入點見 `characters/talents/registry.ts` 導覽註解。
 - **新增一個闖關魔王**：在 `src/game/bosses/<slug>/` 建 `index.ts`（`export default new XxxBoss()`）、`ai.ts`、`model.ts`、`action.ts`。glob 自動納入，依 `round` 排序。
 - **新增/美化技能特效（VFX）**：在角色 `vfx.ts` 內 `registerVfx('<vfxId>', { onCast, onHit, projectile, zone })`，並讓技能資料的 `vfx` 指到該 id。缺 hook 時走通用 fallback（安全不報錯）。
+- **新增一個 HUD 指示器/警示（widget）**：在 `src/game/render3d/hud/widgets/<name>.js` 內 `registerHudWidget({ id, mount(ctx), update(handle, ctx) })`——`mount` 建立自己的 DOM、`update` 每幀更新。glob 自動載入，不必動 `hud.js` 核心。範例見 `hud/widgets/hazardAlert.js`。
 
 ## 開發與測試
 
