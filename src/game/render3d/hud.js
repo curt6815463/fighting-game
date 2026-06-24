@@ -3,32 +3,14 @@
 
 import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { getCharacter } from '../characters.js';
+import { getEffectHud } from '../entities/effects.ts';
 import { ULT_MAX } from '../constants.js';
 import { sceneX, sceneZ } from './coords.js';
 
 const HEAD_Y = 90;
 
-// 狀態效果顯示元資料：icon / 顯示名 / 是否為增益
-const EFFECT_META = {
-  haste:      { icon: '⚡', name: '加速',   buff: true },
-  protect:    { icon: '🛡', name: '護體',   buff: true },
-  reflect:    { icon: '🪞', name: '反射',   buff: true },
-  lifesteal:  { icon: '🩸', name: '吸血',   buff: true },
-  rage:       { icon: '🔥', name: '狂暴',   buff: true },
-  overdrive:  { icon: '⚡', name: '超載',   buff: true },
-  invis:      { icon: '👻', name: '隱身',   buff: true },
-  evading:    { icon: '💨', name: '無敵',   buff: true },
-  slow:       { icon: '🐢', name: '緩速',   buff: false },
-  stun:       { icon: '💫', name: '暈眩',   buff: false },
-  root:       { icon: '🌿', name: '定身',   buff: false },
-  burn:       { icon: '🔥', name: '燃燒',   buff: false },
-  bleed:      { icon: '🩸', name: '流血',   buff: false },
-  chill:      { icon: '❄️', name: '冰寒',   buff: false },
-  frozen:     { icon: '🧊', name: '冰凍',   buff: false },
-  mark:       { icon: '🎯', name: '標記',   buff: false },
-  weaken:     { icon: '💀', name: '衰弱',   buff: false },
-  dmg_reduce: { icon: '🔻', name: '弱化',   buff: false },
-};
+// 狀態效果的顯示中繼資料（icon / 顯示名 / 增益）已與效果邏輯 co-located 於
+// entities/effects.ts 的 EFFECT_DEFS；此處透過 getEffectHud(kind) 查詢，避免維護第二份表。
 
 function getSkillKeys(controlScheme) {
   if (controlScheme === 'arrows-asdf') {
@@ -990,7 +972,7 @@ function buildPlateBuffs(p) {
   const eff = p.effects || {};
   for (const key of Object.keys(eff)) {
     const data = eff[key]; if (!data) continue;
-    const meta = EFFECT_META[key]; if (!meta) continue;
+    const meta = getEffectHud(key); if (!meta) continue;
     if (data.remaining != null && data.remaining <= 0) continue;
     list.push({ buff: meta.buff, icon: meta.icon });
   }
@@ -1021,7 +1003,7 @@ function buildBuffHtml(p) {
   for (const key of Object.keys(eff)) {
     const data = eff[key];
     if (!data) continue;
-    const meta = EFFECT_META[key];
+    const meta = getEffectHud(key);
     if (!meta) continue;
     const remaining = data.remaining;
     if (remaining != null && remaining <= 0) continue;
