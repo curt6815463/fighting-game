@@ -23,12 +23,14 @@ import type { GameState, Player, EntityId } from '../types';
 //   - dealDamage onDealt 區: 造成傷害後副作用（arcane_flow/bloodlust/momentum/suppress…）
 // 新增「會影響傷害」的天賦＝加一個 talent.ts 註冊 hook，不必再改本檔。
 //
-// 仍內聯於 hot-path、尚未納入 registry 的天賦邏輯（aura / 跨實體 / 其他檔 call-site）：
+// 生命週期 hook（playerState / casting）也走 registry：cooldownRate(bloodlust 攻速) /
+// onTimers(iaido 計時) / onRecovery(lifebloom 回血) / onCastResolved(timeprism)。
+//
+// 仍內聯、尚未納入 registry 的天賦邏輯（aura / 跨實體 / 與施放序列緊密耦合）：
 //   • entities/damage.ts   warsongFor()(warsong aura) / spreadCurse()(plague 死亡傳染) /
 //                          summonbond 召喚物命中回主（owner 經召喚物，非攻擊方天賦）
-//   • systems/playerState.ts  bloodlust(攻速) / lifebloom(持續回血) / iaido(計時累積)
 //   • systems/effects.ts      undeath(DoT 汲取回血，見 dotLifesteal)
-//   • actions/combat.ts       pyromancy(強化 burn) ；actions/casting.ts iaido / timeprism
+//   • actions/combat.ts       pyromancy(強化 burn) ；actions/casting.ts iaido 居合就緒判定
 // 註：unbreakable / bulwark 目前僅有資料定義，未見對應減傷邏輯（疑為待補；本次純重構不更動行為）。
 // ──────────────────────────────────────────────────────────────────
 

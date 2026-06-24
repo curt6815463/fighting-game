@@ -5,6 +5,7 @@ import { drawHealerTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { attachSkinGear } from './gear.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'healer', order: 5, evadeType: 'dash', name: '治療師', color: '#ecf0f1', shape: 'circle', sprite: characterSprite('healer', '#ecf0f1', true, drawHealerTexture),

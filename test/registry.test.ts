@@ -51,6 +51,13 @@ describe('talent hook registry', () => {
     expect(getTalentHooks('bloodlust')?.onDealt).toBeTypeOf('function');
     expect(getTalentHooks('retribution')?.onAttacked).toBeTypeOf('function');
   });
+
+  it('registers lifecycle hooks for migrated talents', () => {
+    expect(getTalentHooks('bloodlust')?.cooldownRate).toBeTypeOf('function');
+    expect(getTalentHooks('lifebloom')?.onRecovery).toBeTypeOf('function');
+    expect(getTalentHooks('iaido')?.onTimers).toBeTypeOf('function');
+    expect(getTalentHooks('timeprism')?.onCastResolved).toBeTypeOf('function');
+  });
 });
 
 describe('action handler registry', () => {

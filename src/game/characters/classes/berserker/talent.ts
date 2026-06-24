@@ -1,6 +1,4 @@
-// 天賦 bloodlust（嗜血）：造成傷害時依「失血比」吸血回復。
-// 註：另有「血量越低冷卻越快」的攻速效果仍內聯於 systems/playerState.ts（每幀冷卻流速，
-// 屬另一個 hot-path call-site，之後可隨 cooldownRate hook 搬移）。
+// 天賦 bloodlust（嗜血）：造成傷害時依「失血比」吸血回復；血量越低、技能冷卻越快。
 import { registerTalent } from '../../talents/registry';
 import { missingHp } from '../../../entities/math.ts';
 
@@ -11,5 +9,8 @@ registerTalent('bloodlust', {
       attacker.hp = Math.min(attacker.maxHp, attacker.hp + lifesteal);
       addFx(state, { type: 'popup', x: attacker.x, y: attacker.y, color: '#5cffa6', life: 0.7, text: `+${Math.round(lifesteal)}`, kind: 'heal' });
     }
+  },
+  cooldownRate(_state, p, talent) {
+    return 1 + (talent.haste || 0.6) * missingHp(p);
   },
 });

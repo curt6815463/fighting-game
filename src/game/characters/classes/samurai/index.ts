@@ -5,6 +5,7 @@ import { drawSamuraiTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { tickSamuraiIaijutsu } from './iaijutsu.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'samurai', order: 13, evadeType: 'dash', name: '武士', color: '#151515', shape: 'triangle', sprite: characterSprite('samurai', '#151515', false, drawSamuraiTexture), meleeRole: true,

@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawChronomancerTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'chronomancer', order: 17, evadeType: 'blink', name: '時空術士', color: '#00bcd4', shape: 'circle', sprite: characterSprite('chronomancer', '#00bcd4', false, drawChronomancerTexture),
