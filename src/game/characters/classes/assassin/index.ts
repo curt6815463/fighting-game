@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawAssassinTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'assassin', order: 2, evadeType: 'blink', name: '刺客', color: '#9b59b6', shape: 'triangle', sprite: characterSprite('assassin', '#9b59b6', true, drawAssassinTexture), meleeRole: true,

@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawPaladinTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'paladin', order: 10, evadeType: 'dash', name: '聖騎士', color: '#daa520', shape: 'square', sprite: characterSprite('paladin', '#daa520', false, drawPaladinTexture), meleeRole: true,

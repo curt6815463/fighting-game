@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawBerserkerTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'berserker', order: 6, evadeType: 'dash', name: '狂戰士', color: '#922b21', shape: 'square', sprite: characterSprite('berserker', '#922b21', true, drawBerserkerTexture), meleeRole: true,

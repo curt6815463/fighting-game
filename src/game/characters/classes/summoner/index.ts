@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawSummonerTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'summoner', order: 15, evadeType: 'blink', name: '召喚師', color: '#16a085', shape: 'circle', sprite: characterSprite('summoner', '#16a085', false, drawSummonerTexture),

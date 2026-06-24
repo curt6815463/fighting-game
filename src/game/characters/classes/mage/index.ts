@@ -5,6 +5,7 @@ import { drawMageTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { attachSkinGear } from './gear.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'mage', order: 1, evadeType: 'blink', name: '法師', color: '#3498db', shape: 'circle', sprite: characterSprite('mage', '#3498db', true, drawMageTexture),

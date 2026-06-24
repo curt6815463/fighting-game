@@ -5,6 +5,7 @@ import { drawArcherTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { attachSkinGear } from './gear.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'archer', order: 4, evadeType: 'dash', name: '弓箭手', color: '#27ae60', shape: 'circle', sprite: characterSprite('archer', '#27ae60', true, drawArcherTexture),

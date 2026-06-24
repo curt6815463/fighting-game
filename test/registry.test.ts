@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import { CHARACTERS, getCharacter } from '../src/game/characters.js';
 import { BOSSES, BOSS_COUNT, getBossForRound } from '../src/game/bosses.js';
 import { ACTION_HANDLERS } from '../src/game/actions/handlers/index.ts';
+import { getTalentHooks } from '../src/game/characters/talents/registry.ts';
 
 const SLOTS = ['basic', 'skill1', 'skill2', 'ultimate', 'evade'] as const;
 
@@ -36,6 +37,19 @@ describe('character registry', () => {
     expect(getCharacter(100)?.id).toBe(100);
     expect(getCharacter(-1)).toBeTruthy();
     expect(getCharacter(-2)).toBeTruthy();
+  });
+});
+
+describe('talent hook registry', () => {
+  // 守護「角色 index.ts 忘了 import './talent.ts'」這類靜默漏接：傷害管線天賦的 hook 必須註冊。
+  it('registers damage-pipeline hooks for migrated talents', () => {
+    expect(CHARACTERS.length).toBeGreaterThan(0); // 確保 glob 已載入觸發 talent 註冊
+    expect(getTalentHooks('lethal')?.modifyOutgoing).toBeTypeOf('function');
+    expect(getTalentHooks('deadeye')?.modifyOutgoing).toBeTypeOf('function');
+    expect(getTalentHooks('summonbond')?.modifyIncoming).toBeTypeOf('function');
+    expect(getTalentHooks('arcane_flow')?.onDealt).toBeTypeOf('function');
+    expect(getTalentHooks('bloodlust')?.onDealt).toBeTypeOf('function');
+    expect(getTalentHooks('retribution')?.onAttacked).toBeTypeOf('function');
   });
 });
 

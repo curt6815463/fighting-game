@@ -5,6 +5,7 @@ import { drawFighterTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { attachSkinGear } from './gear.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'fighter', order: 9, evadeType: 'dash', name: '格鬥家', color: '#f1c40f', shape: 'circle', sprite: characterSprite('fighter', '#f1c40f', true, drawFighterTexture), meleeRole: true,

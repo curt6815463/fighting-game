@@ -5,6 +5,7 @@ import { drawNinjaTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { attachSkinGear } from './gear.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'ninja', order: 7, evadeType: 'blink', name: '忍者', color: '#2c3e50', shape: 'triangle', sprite: characterSprite('ninja', '#2c3e50', true, drawNinjaTexture),

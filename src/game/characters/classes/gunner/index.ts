@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawGunnerTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'gunner', order: 14, evadeType: 'dash', name: '槍手', color: '#d4a017', shape: 'circle', sprite: characterSprite('gunner', '#d4a017', false, drawGunnerTexture),
