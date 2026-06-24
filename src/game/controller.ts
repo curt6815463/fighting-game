@@ -87,7 +87,7 @@ function createController(): GameController {
   let selfId: string | null = null;
   let myName = '';
   let roomCode = '';
-  let selectedChar = 0;
+  let selectedChar: string = CHARACTERS[0]?.id ?? 'warrior'; // 角色 slug（穩定唯一 id）
   let selectedControlScheme: ControlScheme = 'wasd-jkl';
   let selectedTeam = 0; // 0 = 單人；正數 = 組隊
   let gameFlags: GameFlags = { freeMana: false, noCooldown: false, noDamage: false, difficulty: 0.5 };
@@ -141,11 +141,11 @@ function createController(): GameController {
     net.on('onData', (from: string, data: any) => {
       if (data.t === 'hello') {
         if (lobby.length >= MAX_PLAYERS) { net.sendTo(from, { t: 'full' }); return; }
-        addToLobby({ id: from, name: data.name, charId: data.charId | 0, controlScheme: data.controlScheme || 'wasd-jkl', isHost: false, team: data.team | 0 });
+        addToLobby({ id: from, name: data.name, charId: data.charId ?? CHARACTERS[0]?.id, controlScheme: data.controlScheme || 'wasd-jkl', isHost: false, team: data.team | 0 });
         broadcastLobby();
       } else if (data.t === 'select') {
         const p = lobby.find((x) => x.id === from);
-        if (p) { p.charId = data.charId | 0; if (data.controlScheme) p.controlScheme = data.controlScheme; if (data.team != null) p.team = data.team | 0; broadcastLobby(); }
+        if (p) { if (data.charId != null) p.charId = data.charId; if (data.controlScheme) p.controlScheme = data.controlScheme; if (data.team != null) p.team = data.team | 0; broadcastLobby(); }
       } else if (data.t === 'input') {
         inputs[from] = data.input;
       }
@@ -551,7 +551,7 @@ function createController(): GameController {
     net.join(code);
   }
 
-  function selectChar(charId: number) {
+  function selectChar(charId: string) {
     selectedChar = charId;
     if (role === 'host') {
       const me = lobby.find((p) => p.id === selfId);
@@ -590,7 +590,7 @@ function createController(): GameController {
     if (role !== 'host') return;
     if (lobby.length >= MAX_PLAYERS) return;
     const npcId = 'npc-' + Math.random().toString(36).slice(2, 8);
-    const charId = Math.floor(Math.random() * CHARACTERS.length);
+    const charId = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)].id;
     const npcNum = lobby.filter((p) => p.isNpc).length + 1;
     lobby.push({ id: npcId, name: `NPC ${npcNum}`, charId, controlScheme: 'wasd-jkl', isHost: false, isNpc: true, team: 0 });
     broadcastLobby();
@@ -609,7 +609,7 @@ function createController(): GameController {
   }
 
   // ---------- 開發者模式：直接進入遊戲（指定或隨機角色）----------
-  function devStartGame(charId?: number) {
+  function devStartGame(charId?: string) {
     const DEV_MODE = true;
     if (!DEV_MODE) return;
 
@@ -621,21 +621,17 @@ function createController(): GameController {
 
     // 生成隨機玩家（2-4個角色）
     const numPlayers = Math.floor(Math.random() * 3) + 2; // 2-4 players
-    const allCharIds = Array.from({ length: CHARACTERS.length }, (_, i) => i); // 0..N-1 characters
+    const allCharIds = CHARACTERS.map((c) => c.id); // 角色 slug 清單
+    const randomCharId = () => allCharIds[Math.floor(Math.random() * allCharIds.length)];
     lobby = [];
 
-    // 自己：使用指定的角色或隨機選取
-    let charForSelf: number;
-    if (charId !== undefined && charId >= 0 && charId < CHARACTERS.length) {
-      charForSelf = charId;
-    } else {
-      charForSelf = allCharIds[Math.floor(Math.random() * allCharIds.length)];
-    }
+    // 自己：使用指定的角色（slug）或隨機選取
+    const charForSelf: string = (charId !== undefined && allCharIds.includes(charId)) ? charId : randomCharId();
     lobby.push({ id: selfId, name: myName, charId: charForSelf, controlScheme: selectedControlScheme, isHost: true, team: selectedTeam });
 
     // 其他玩家
     for (let i = 1; i < numPlayers; i++) {
-      const randomChar = allCharIds[Math.floor(Math.random() * allCharIds.length)];
+      const randomChar = randomCharId();
       lobby.push({
         id: 'dev-' + i,
         name: `NPC ${i}`,
@@ -654,15 +650,16 @@ function createController(): GameController {
   }
 
   // ---------- 開發者：直接進入闖關模式 (?dev=true&boss=true) ----------
-  function devStartBoss(charId?: number, round = 1) {
+  function devStartBoss(charId?: string, round = 1) {
     myName = 'Dev Player';
     role = 'host';
     selfId = 'dev-' + Math.random().toString(36).slice(2, 9);
     roomCode = 'DEV';
-    const all = Array.from({ length: CHARACTERS.length }, (_, i) => i);
-    const me = (charId !== undefined && charId >= 0 && charId < CHARACTERS.length) ? charId : all[Math.floor(Math.random() * all.length)];
+    const all = CHARACTERS.map((c) => c.id); // 角色 slug 清單
+    const randomCharId = () => all[Math.floor(Math.random() * all.length)];
+    const me: string = (charId !== undefined && all.includes(charId)) ? charId : randomCharId();
     lobby = [{ id: selfId, name: myName, charId: me, controlScheme: selectedControlScheme, isHost: true, team: 1 }];
-    for (let i = 1; i <= 2; i++) lobby.push({ id: 'dev-' + i, name: '隊友 ' + i, charId: all[Math.floor(Math.random() * all.length)], controlScheme: 'wasd-jkl', isHost: false, isNpc: true, team: 1 });
+    for (let i = 1; i <= 2; i++) lobby.push({ id: 'dev-' + i, name: '隊友 ' + i, charId: randomCharId(), controlScheme: 'wasd-jkl', isHost: false, isNpc: true, team: 1 });
     selectedChar = me; selectedTeam = 1;
     startBossSession(round, 'campaign');
   }

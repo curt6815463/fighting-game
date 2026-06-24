@@ -12,7 +12,7 @@ function setup(playerCount = 2) {
   const boss: any = makeBoss('boss-11', 110, 1200, 450, 2, { isBoss: true, aiId: 'time_devourer' });
   state.players[boss.id] = boss;
   for (let i = 0; i < playerCount; i++) {
-    const p: any = makePlayer(`p${i}`, `P${i}`, 0, 300 + i * 100, 900, 1);
+    const p: any = makePlayer(`p${i}`, `P${i}`, 'warrior', 300 + i * 100, 900, 1);
     state.players[p.id] = p;
   }
   return { state, boss };

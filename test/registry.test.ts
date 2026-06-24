@@ -10,22 +10,29 @@ import { ACTION_HANDLERS } from '../src/game/actions/handlers/index.ts';
 const SLOTS = ['basic', 'skill1', 'skill2', 'ultimate', 'evade'] as const;
 
 describe('character registry', () => {
-  it('exposes 19 player characters with sequential ids 0..18', () => {
-    expect(CHARACTERS.length).toBe(19);
-    CHARACTERS.forEach((c: any, i: number) => expect(c.id).toBe(i));
+  it('exposes player characters with unique string slug ids', () => {
+    expect(CHARACTERS.length).toBeGreaterThanOrEqual(19);
+    // id 為穩定字串 slug（= 資料夾名），不再是連續數字索引 → 新增角色不會搶號衝突。
+    for (const c of CHARACTERS as any[]) {
+      expect(typeof c.id, `${c.name} id should be a slug string`).toBe('string');
+    }
+    const ids = (CHARACTERS as any[]).map((c) => c.id);
+    expect(new Set(ids).size, 'character slug ids must be unique').toBe(ids.length);
   });
 
-  it('gives every character all action slots + a talent', () => {
+  it('gives every character all action slots + a talent + an evade type', () => {
     for (const c of CHARACTERS as any[]) {
       expect(c.basic?.type, `${c.name} basic`).toBeTruthy();
       expect(c.ultimate?.type, `${c.name} ultimate`).toBeTruthy();
       expect(c.evade?.type, `${c.name} evade`).toBeTruthy();
+      expect(['blink', 'dash'], `${c.name} evadeType`).toContain(c.evadeType);
       expect(c.talent?.id, `${c.name} talent`).toBeTruthy();
     }
   });
 
-  it('resolves bosses (>=100) and minions (<0) through getCharacter', () => {
-    expect(getCharacter(18)?.name).toBe('星環使');
+  it('resolves players (slug), bosses (>=100) and minions (<0) through getCharacter', () => {
+    expect(getCharacter('star-orbit')?.name).toBe('星環使');
+    expect(getCharacter('warrior')?.id).toBe('warrior');
     expect(getCharacter(100)?.id).toBe(100);
     expect(getCharacter(-1)).toBeTruthy();
     expect(getCharacter(-2)).toBeTruthy();

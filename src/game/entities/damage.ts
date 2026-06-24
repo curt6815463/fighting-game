@@ -341,7 +341,7 @@ export function dealDamage(
     recordKill(state, attackerId, target);
     recordDeath(state, target);
     if (target.effects && target.effects.weaken) spreadCurse(state, target);
-    const bossDeathVfx = target.isBoss && state.mode === 'boss' ? getBoss(target.charId)?.data?.deathVfx : null;
+    const bossDeathVfx = target.isBoss && state.mode === 'boss' ? getBoss(target.charId as number)?.data?.deathVfx : null;
     if (!bossDeathVfx) {
       addFx(state, { type: 'death', x: target.x, y: target.y, color: '#ffffff', life: 0.5, radius: PLAYER_RADIUS * 2 });
     }

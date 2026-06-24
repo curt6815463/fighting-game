@@ -9,8 +9,8 @@ function setup() {
   const state: any = createInitialState([], {}, { mode: 'boss' });
   state.roundPhase = 'fighting';
   const boss: any = makeBoss('boss-12', 111, 1200, 450, 2, { isBoss: true, aiId: 'star_forge' });
-  const left: any = makePlayer('left', 'Left', 1, 1000, 700, 1);
-  const right: any = makePlayer('right', 'Right', 1, 1400, 700, 1);
+  const left: any = makePlayer('left', 'Left', 'mage', 1000, 700, 1);
+  const right: any = makePlayer('right', 'Right', 'mage', 1400, 700, 1);
   state.players = { [boss.id]: boss, [left.id]: left, [right.id]: right };
   return { state, boss, left, right };
 }

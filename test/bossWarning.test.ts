@@ -17,7 +17,7 @@ function tickUntilWindup(state: any, boss: any, maxTicks = 100) {
 describe('boss warning indicators and windup time', () => {
   it('telegraphs with a positive windup before firing a boss skill', () => {
     const state = createInitialState([], {}, { mode: 'boss' });
-    const player = makePlayer('player1', 'Hero', 0, 150, 150, 1);
+    const player = makePlayer('player1', 'Hero', 'warrior', 150, 150, 1);
     const boss = makeBoss('boss1', 108, 100, 100, 2, { isBoss: true });
 
     state.players['player1'] = player;
@@ -44,7 +44,7 @@ describe('boss warning indicators and windup time', () => {
 
   it('calculates accurate projectile warning line', () => {
     const state = createInitialState([], {}, { mode: 'boss' });
-    const player = makePlayer('player1', 'Hero', 0, 300, 100, 1);
+    const player = makePlayer('player1', 'Hero', 'warrior', 300, 100, 1);
     const boss = makeBoss('boss1', 105, 100, 100, 2, { isBoss: true });
 
     state.players['player1'] = player;
@@ -73,7 +73,7 @@ describe('boss warning indicators and windup time', () => {
 
   it('updates warning indicator position dynamically as the boss moves during windup', () => {
     const state = createInitialState([], {}, { mode: 'boss' });
-    const player = makePlayer('player1', 'Hero', 0, 150, 150, 1);
+    const player = makePlayer('player1', 'Hero', 'warrior', 150, 150, 1);
     const boss = makeBoss('boss1', 108, 100, 100, 2, { isBoss: true });
 
     state.players['player1'] = player;
