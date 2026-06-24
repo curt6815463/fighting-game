@@ -1026,6 +1026,6 @@ function isLavaBurning(state, me) {
   const burn = me && me.effects && me.effects.burn;
   if (!burn || burn.remaining <= 0) return false;
   if (state.mode !== 'boss') return false;
-  const boss = Object.values(state.players || {}).find((p) => p && p.isBoss && p.charId === 102);
+  const boss = Object.values(state.players || {}).find((p) => p && p.isBoss && getCharacter(p.charId)?.lavaBurn);
   return !!boss && (burn.srcId == null || burn.srcId === boss.id);
 }
