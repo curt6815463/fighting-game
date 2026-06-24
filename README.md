@@ -128,8 +128,6 @@ src/
     input.js          鍵盤 → input state（三套操作配置）
     network.js        PeerJS P2P 包裝（host 星狀拓撲）
     renderer.js       three.js 渲染入口（編排 render3d/ 模組 + 音效偵測）
-    renderer.canvas2d.js  舊版 Canvas2D 渲染（保留備援參考）
-    render2d/         Canvas2D 版繪製模組（備援）
     render3d/         three.js 渲染模組
       scene.js        WebGLRenderer/相機/燈光/地板/泛光後處理/震動閃光
       models.js       18 角色程序化 3D 模型 + 動畫狀態機
