@@ -2,7 +2,9 @@
 
 > 對象：本專案的人類／AI 共同維護者。
 > 目的：在**不改變遊戲行為**的前提下，關閉幾個「橫切關注點」的衝突熱點，讓「新增一個角色／效果／天賦」真正做到 **加一個檔案、零中央編輯**。
-> 狀態：**規劃中（尚未動手）**。本文件先給維護者 review，確認後再依「實作順序」逐項落地。
+> 狀態：**四項皆已實作落地**（2026-06，branch `refactor/architecture-extensibility`）。
+> commits：`2162bc8` 基線 → `f03e25b` ① → `4ca42dd` ④ → `a02d17c` ③ → `294b582` ②。
+> 每一步均 `yarn build` 綠 + `yarn test:run` 全過，determinism 黃金快照逐位元不變（除基線那次刻意刷新）。
 
 ---
 
@@ -12,12 +14,19 @@
 
 本計畫處理四項（依「價值／風險比」排序，但實作有相依，見 §4）：
 
-| # | 重構 | 解決的痛點 | 風險 | 影響行為？ |
-|---|---|---|---|---|
-| ① | 網路序列化 manifest | `controller.ts` 手抄欄位 → 衝突＋desync | 低 | 否 |
-| ④ | `evade` data-driven | 硬編 `DEFAULT_BLINK_IDS` 角色 id | 低 | 否 |
-| ② | 天賦 hook registry | 天賦邏輯內聯散在 5 個檔 | **中高（hot-path）** | 否（測試守護） |
-| ③ | 拆解 `controller.ts` | 839 行上帝檔（churn 第一名） | 中 | 否 |
+| # | 重構 | 解決的痛點 | 風險 | 影響行為？ | 狀態 |
+|---|---|---|---|---|---|
+| ① | 網路序列化 manifest | `controller.ts` 手抄欄位 → 衝突＋desync | 低 | 否 | ✅ `f03e25b` |
+| ④ | `charId` 穩定 slug + `evade` data-driven | 硬編數字 id / `DEFAULT_BLINK_IDS` | 低 | 否 | ✅ `4ca42dd` |
+| ② | 天賦 hook registry（傷害管線） | 天賦邏輯內聯散在 5 個檔 | **中高（hot-path）** | 否（測試守護） | ✅ `294b582` |
+| ③ | 拆解 `controller.ts` | 839 行上帝檔（churn 第一名） | 中 | 否 | ✅ `a02d17c`（→594 行） |
+
+> **④ 範圍變更（實作時依維護者決定擴大）**：原規劃僅把 `evade` data-driven 化、保留數字 `charId`；
+> 實作時改為**玩家 `charId` 全面改用穩定字串 slug**（= 資料夾名），徹底消滅「兩人加角色搶同一數字」的衝突。
+> 魔王（≥100）/召喚物（<0）沿用數字 id-space。原斷言「連續 0..18」的 registry 測試已改為「slug 唯一 + evadeType 必填」。
+>
+> **② 範圍**：本次只搬「傷害管線」hook（`damage.ts`，churn 熱點）。aura/跨實體/其他檔 call-site 的天賦
+> 邏輯（warsong、plague、playerState/combat/effects/casting 的部分）仍內聯，已於程式碼導覽註解標示為後續增量。
 
 **驗證鐵則（每一步、每一項都適用）**：`yarn build` 綠燈 **且** `yarn test:run` 的 determinism 黃金快照不變。快照不變 = 行為未變。詳見 §5。
 
@@ -418,7 +427,7 @@ yarn test:run     # determinism 黃金快照 + registry 不變式，必須全綠
 
 ## 附錄：本計畫不改變的「硬合約」
 
-- **數字 `charId`**：網路協定值＋陣列索引，`test/registry.test.ts` 斷言連續 0..18。新增角色仍須取下一個 id（這是 array-index 協定的固有成本，不在本次解決）。
+- ~~**數字 `charId`**：網路協定值＋陣列索引~~ → 已於 ④ 改為**穩定字串 slug**（玩家角色）。魔王（≥100）/召喚物（<0）仍為數字 id-space。新增角色用 slug、永不搶號。
 - **30Hz `setInterval` 驅動邏輯**：分頁背景時 rAF 會暫停，邏輯必須用 setInterval。重構迴圈時不可改回純 rAF。
 - **host-authoritative 資料流**：只有房主跑 `step()`，加入者插值/預測。序列化重構不改變這個拓撲。
 - **determinism 黃金快照**：是行為等價的唯一裁判，凌駕一切重構。
