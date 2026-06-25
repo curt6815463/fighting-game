@@ -103,7 +103,9 @@ export const arena: ArenaDef = {
 
 - `world = scene + (HALF_W, HALF_H)`，即 `(+1200, +800)`（見 `render3d/coords.js`）。
   例：神殿視覺在場景 `(760, -420)` → 碰撞中心世界 `(1960, 380)`。
-- 長方形基座用**多個圓沿長軸排列**貼合（單一圓太小，玩家會站上外側台階）。
+- 形狀：圓形給 `{x,y,r}`；**長方形地標給有向方框 `{x,y,hw,hh,rot}`**（無死角、推薦）。
+  `rot` = 視覺道具的 `rotation.y` 取負（對齊朝向）；`hw/hh` = 視覺半寬/半高（含 scale）。
+- 會擋住**所有實體含 boss**（地標是固定的）；`isPart` 不獨立推（跟著 boss）。
 - 碰撞是 **host 權威**（`step()` 內 `resolveStaticColliders`）；連線時遠端玩家的本機預測未含，靠近可能輕微回彈。
 
 驗證對齊：可暫時在 `renderer.js` 套用主題處，把 `colliders` 畫成洋紅 `RingGeometry`（`depthTest:false`）比對視覺基座。

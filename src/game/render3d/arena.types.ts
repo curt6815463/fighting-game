@@ -5,11 +5,19 @@
 //
 // 座標：道具設定中的 x/z 是「場景座標」(原點=場中心)；colliders 是「世界座標」(world = scene + 1200/800)。
 
-/** 靜態圓形障礙（世界座標）：擋住玩家移動，例：神殿基座。需與對應視覺道具的位置對齊。 */
+/** 靜態障礙（世界座標）：擋住實體移動，例：神殿基座。需與對應視覺道具位置對齊。
+ *  圓形 → 給 r；長方形地標 → 給 hw/hh/rot (有向方框，無死角，建議用這個)。 */
 export interface ArenaCollider {
   x: number;
   y: number;
-  r: number;
+  /** 圓形半徑。 */
+  r?: number;
+  /** 有向方框半寬 (沿 rot 方向)。 */
+  hw?: number;
+  /** 有向方框半高 (垂直 rot 方向)。 */
+  hh?: number;
+  /** 方框旋轉 (弧度)。對齊視覺道具的朝向。 */
+  rot?: number;
 }
 
 /** 中央地刻（法陣/裂縫/符文…）。kind 內建見 decorations/floor.js 的 makeFloorPattern。 */

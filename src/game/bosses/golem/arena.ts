@@ -25,11 +25,11 @@ export const arena: ArenaDef = {
     atmosphere: { kind: 'leaves', color: '#a6c84a', rate: 16 },
     floorDecal: { kind: 'grove', color: '#9ff06a', glowColor: 0x7ad84a, opacity: 0.58, glow: 1.6, pulse: 0.55, size: 0.62 },
   },
-  // 神殿基座實體碰撞：3 圓沿基座長軸(朝場中心)排列，貼合 646×408 長方形，避免站上台階/空中隱形牆。
+  // 神殿基座實體碰撞：單一有向方框，精準貼合長方形基座 (無死角，連 boss 也擋)。
   // world = scene + (1200, 800)；對齊 theme.temple x=760,z=-420 → 世界中心 1960,380。
+  // 基座底階 380×240 ×scale1.7 = 646×408 → 半寬/半高 323/204 (留 ~3 邊距)；
+  // rot = -atan2(-760,420) = 1.0663 (對齊神殿朝向場中心)。
   colliders: [
-    { x: 1887, y: 249, r: 215 },
-    { x: 1960, y: 380, r: 215 },
-    { x: 2033, y: 511, r: 215 },
+    { x: 1960, y: 380, hw: 326, hh: 207, rot: 1.0663 },
   ],
 };
