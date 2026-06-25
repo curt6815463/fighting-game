@@ -3,6 +3,7 @@ import { BURN, STUN, SLOW, ROOT, CHILL } from '../effects.js';
 import { aiProfile } from './ai.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { loadVfx } from './vfx.ts';
+import { arena } from './arena.ts';
 
 const data = {
     id: 100, round: 1, name: '巨木傀儡', subtitle: '森林守護者',
@@ -25,35 +26,9 @@ const data = {
     ],
     hazardText: '⚠️ 快離開攻擊範圍！',
     hazardColor: '#e6b352',
-    // 靜態障礙 (世界座標)：神殿基座，擋住玩家移動。需與 theme.temple 對齊
-    // (world = scene + half；temple x=760,z=-420 → 世界中心 1960,380)
-    // 用 3 圓沿基座長軸(朝場中心)排列，貼合 646×408 的長方形基座，避免站上台階/空中隱形牆
-    colliders: [
-      { x: 1887, y: 249, r: 215 },
-      { x: 1960, y: 380, r: 215 },
-      { x: 2033, y: 511, r: 215 },
-    ],
-    // 森林神殿遺跡：苔蘚石造廢墟 + 參天古樹盤根 + 中央發光符文法陣
-    theme: {
-      sky: 0x243826, fog: 0x18271b, fogNear: 820, fogFar: 3000,
-      floorStyle: 'mossy', outerGround: 0x6f7a54,
-      wallStyle: 'natural', wallTrimGlow: 0,
-      wallStone: 0x3c4a32, wallTrim: 0x3c4a32,
-      hemiSky: 0x9fce5a, hemiGround: 0x243016, hemiInt: 0.6,
-      sunColor: 0xfff0b0, sunInt: 2.2, rimColor: 0x6fae3e, rimInt: 0.45,
-      decorations: ['godrays', 'temple', 'ruins', 'tree', 'roots', 'foliage', 'groundcover', 'rock', 'crystal'],
-      godrays: { count: 7, color: 0xe8ffc8, opacity: 0.32 },
-      temple: { color: 0x5e6450, moss: 0x4e6f30, glow: 0x6fd23a, x: 760, z: -420, scale: 1.7 },
-      ruins: { count: 6, color: 0x636757, moss: 0x4e6f30, vine: 0x3e5e26, scale: 1.3 },
-      tree: { count: 26, big: true, trunk: 0x3a2718, leaf: 0x274a1a, leafTop: 0x77b343 },
-      roots: { count: 14, color: 0x2f2114 },
-      foliage: { count: 32, low: 0x2c4a1a, high: 0x5f8a30 },
-      groundcover: { splotches: 30, tufts: 18, rInner: 340, rOuter: 840, low: 0x2c4a1a, high: 0x5f8a30 },
-      rock: { count: 16, color: 0x6a6560 },
-      crystal: { count: 8, color: 0x9be86a, glow: 0x6fd23a, glowInt: 0.9 },
-      atmosphere: { kind: 'leaves', color: '#a6c84a', rate: 16 },
-      floorDecal: { kind: 'grove', color: '#9ff06a', glowColor: 0x7ad84a, opacity: 0.58, glow: 1.6, pulse: 0.55, size: 0.62 },
-    },
+    // 場地（場景主題 + 神殿基座碰撞）定義於 ./arena.ts
+    colliders: arena.colliders,
+    theme: arena.theme,
 
     phases: [
       { hpPct: 0.66, name: '狂亂之根', sub: '怒火覺醒', color: '#a6d749', dmgMult: 1.0, speedMult: 1.1, cdMult: 0.85,
