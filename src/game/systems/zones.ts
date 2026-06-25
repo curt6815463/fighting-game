@@ -57,10 +57,10 @@ export function updateZones(state: GameState, dt: number) {
         if (isEnemy(state, zone.owner, o)) {
           if (zone.dmg || zone.dmgPct) {
             const dmg = zone.dmgPct ? Math.max(1, Math.round(o.maxHp * zone.dmgPct)) : zone.dmg;
-            dealDamage(state, o, dmg, zone.owner);
+            dealDamage(state, o, dmg, zone.owner, { source: zone.srcSlot });
           }
-          if (zone.effect) applyEffectFrom(state, o, zone.effect, zone.owner);
-          if (zone.effects) for (const e of zone.effects) applyEffectFrom(state, o, e, zone.owner);
+          if (zone.effect) applyEffectFrom(state, o, zone.effect, zone.owner, zone.srcSlot);
+          if (zone.effects) for (const e of zone.effects) applyEffectFrom(state, o, e, zone.owner, zone.srcSlot);
           if (zone.knockback) {
             const dx = o.x - zone.x;
             const dy = o.y - zone.y;

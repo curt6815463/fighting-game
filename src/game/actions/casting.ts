@@ -23,7 +23,7 @@ function executeChargedAction(state: GameState, p: Player, slot: string) {
     addFx(state, { type: 'skillname', x: p.x, y: p.y, color: action.color || '#ffffff', life: 1.0, text: action.name, owner: p.id });
   }
   recordSkillUse(state, p, slot);
-  executeAction(state, p, action, { chargeFactor, chargeRatio: ratio });
+  executeAction(state, p, action, { chargeFactor, chargeRatio: ratio, source: slot });
   p.chargeState = null;
 }
 
@@ -72,7 +72,7 @@ export function tryAction(state: GameState, p: Player, slot: string) {
     addFx(state, { type: 'skillname', x: p.x, y: p.y, color: action.color || '#ffffff', life: 1.0, text: action.name, owner: p.id });
   }
   recordSkillUse(state, p, slot);
-  executeAction(state, p, action);
+  executeAction(state, p, action, { source: slot });
   p.iaiReady = false;
   // iaido 居合就緒（讀寫 iaiReady、與施放序列緊密耦合）仍內聯於上方；timeprism 等施放後效果走 hook。
   getTalentHooks(talent?.id)?.onCastResolved?.(state, p, action, slot, talent);
@@ -95,7 +95,7 @@ export function tryUltimate(state: GameState, p: Player) {
     p.iaiReady = p.iaiTimer >= (talent.delay || 2);
     p.iaiTimer = 0;
   }
-  executeAction(state, p, action, { silent: true });
+  executeAction(state, p, action, { silent: true, source: 'ultimate' });
   p.iaiReady = false;
 
   getTalentHooks(talent?.id)?.onCastResolved?.(state, p, action, 'ultimate', talent);

@@ -32,9 +32,15 @@ function bossActionHelpers() {
 
 export function executeAction(state: GameState, caster: Player, action: ActionDef, opts: ActionOpts = {}) {
   const ctx = createActionContext(state, caster, action, opts, executeAction);
+  // DPS 歸因：標記目前施放的技能 slot。同步傷害經 dealDamage 的 _srcSlot fallback 取用；
+  // deferred 實體（投射物/區域/DoT）則由各 handler 讀 ctx.source 於建立時 stamp。
+  // save/restore 以支援巢狀施放（combo/echo/合成動作）。
+  const prevSrc = caster._srcSlot;
+  caster._srcSlot = ctx.source != null ? ctx.source : prevSrc;
   const handler = ACTION_HANDLERS.get(action.type);
   if (handler) handler(ctx);
   else executeBossAction(state, caster, action, bossActionHelpers());
   runPostActionEffects(ctx);
+  caster._srcSlot = prevSrc;
   maybeScheduleTemporalEcho(state, caster, action);
 }

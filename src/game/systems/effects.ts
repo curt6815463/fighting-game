@@ -31,7 +31,7 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        dealDamage(state, p, effect.dmg, effect.srcId);
+        dealDamage(state, p, effect.dmg, effect.srcId, { source: effect.srcSlot });
         dotLifesteal(state, effect.srcId, effect.dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#ff6b3d', life: 0.3, radius: PLAYER_RADIUS });
       }
@@ -40,7 +40,7 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt * (moving ? effect.moveMult : 1);
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        dealDamage(state, p, effect.dmg, effect.srcId);
+        dealDamage(state, p, effect.dmg, effect.srcId, { source: effect.srcSlot });
         dotLifesteal(state, effect.srcId, effect.dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#e84141', life: 0.3, radius: PLAYER_RADIUS });
       }
@@ -48,7 +48,7 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        dealDamage(state, p, effect.dmg, effect.srcId, { dot: true });
+        dealDamage(state, p, effect.dmg, effect.srcId, { dot: true, source: effect.srcSlot });
         dotLifesteal(state, effect.srcId, effect.dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#1abc9c', life: 0.3, radius: PLAYER_RADIUS });
       }

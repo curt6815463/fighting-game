@@ -7,7 +7,7 @@
 import type { Player, Projectile, Zone, Fx, Destructible, EntityId, DropItem } from './entities';
 
 export type GamePhase = 'playing' | 'gameover';
-export type GameMode = 'ffa' | 'boss';
+export type GameMode = 'ffa' | 'boss' | 'training';
 /** 闖關回合階段：登場 → 戰鬥 → 清關 / 全滅。 */
 export type RoundPhase = 'intro' | 'fighting' | 'cleared' | 'wiped';
 

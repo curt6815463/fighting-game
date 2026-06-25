@@ -31,6 +31,7 @@ export function startSamuraiIaijutsu(ctx: ActionContext) {
       impactColor: action.color || '#d94343',
       vfx: action.vfx,
       final: i === count - 1,
+      srcSlot: ctx.source,
     })),
   };
 
@@ -93,12 +94,12 @@ function resolveSamuraiStrike(state: any, samurai: any, strike: any) {
     if (forward < -bodyR(o) || forward > strike.range + bodyR(o)) continue;
     const perp = Math.abs(Math.sin(angleDiff(Math.atan2(dy, dx), strike.facing)) * Math.hypot(dx, dy));
     if (perp > strike.radius + bodyR(o)) continue;
-    dealDamage(state, o, strike.dmg || 0, samurai.id, { meleeHit: true });
+    dealDamage(state, o, strike.dmg || 0, samurai.id, { meleeHit: true, source: strike.srcSlot });
     if (strike.knockback) {
       o.kvx += cos * strike.knockback;
       o.kvy += sin * strike.knockback;
     }
-    if (strike.effect) applyEffectFrom(state, o, strike.effect, samurai.id);
+    if (strike.effect) applyEffectFrom(state, o, strike.effect, samurai.id, strike.srcSlot);
   }
   addFx(state, {
     type: 'hit',

@@ -48,6 +48,7 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
         tickTimer: cur ? cur.tickTimer : tick,
         dmg: Math.max(cur ? cur.dmg : 0, data.dmg || 0),
         srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
+        srcSlot: data.srcSlot != null ? data.srcSlot : (cur ? cur.srcSlot : undefined),
       };
     },
   },
@@ -64,6 +65,7 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
         dmg: Math.max(cur ? cur.dmg : 0, data.dmg || 0),
         moveMult: data.moveMult || 1.5,
         srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
+        srcSlot: data.srcSlot != null ? data.srcSlot : (cur ? cur.srcSlot : undefined),
       };
     },
   },
@@ -88,6 +90,7 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
         burstRadius: data.burstRadius || 150,
         spreadDur: data.spreadDur || 3,                         // 擴散出的弱寄生持續時間
         srcId: srcId,
+        srcSlot: data.srcSlot,
       };
     },
   },

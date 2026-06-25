@@ -30,6 +30,7 @@ function splitProjectile(state: GameState, projectile: Projectile, out: Projecti
       pierce: !!s.pierce,
       effect: s.effect || projectile.effect,
       vfx: s.vfx || projectile.vfx,
+      srcSlot: projectile.srcSlot,
     }));
   }
   addFx(state, { type: 'hit', x: projectile.x, y: projectile.y, color: s.color || projectile.color, life: 0.22, radius: (projectile.radius || 8) * 2.4, vfx: projectile.vfx });
@@ -70,7 +71,7 @@ export function updateProjectiles(state: GameState, dt: number) {
     const oob = projectile.x < 0 || projectile.y < 0 || projectile.x > ARENA.width || projectile.y > ARENA.height;
     if (projectile.lifetime <= 0 || oob) {
       if (projectile.split && !oob) splitProjectile(state, projectile, spawned);
-      if (projectile.leaveZone && !oob) state.zones.push(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone));
+      if (projectile.leaveZone && !oob) state.zones.push(Object.assign(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone), { srcSlot: projectile.srcSlot }));
       continue;
     }
 
@@ -100,7 +101,7 @@ export function updateProjectiles(state: GameState, dt: number) {
         const hitDmg = projectile.freezeBonus && o.effects && o.effects.stun
           ? projectile.dmg * projectile.freezeBonus
           : projectile.dmg;
-        dealDamage(state, o, hitDmg, projectile.owner);
+        dealDamage(state, o, hitDmg, projectile.owner, { source: projectile.srcSlot });
         if (projectile.knockback) {
           const l = Math.hypot(projectile.vx, projectile.vy) || 1;
           o.kvx += (projectile.vx / l) * projectile.knockback;
@@ -117,7 +118,7 @@ export function updateProjectiles(state: GameState, dt: number) {
             o.y = clamp(owner.y - dy / d * gap, PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
           }
         }
-        if (projectile.effect) applyEffectFrom(state, o, projectile.effect, projectile.owner);
+        if (projectile.effect) applyEffectFrom(state, o, projectile.effect, projectile.owner, projectile.srcSlot);
         addFx(state, { type: 'hit', x: projectile.x, y: projectile.y, color: projectile.color, life: 0.2, radius: projectile.radius * 2, vfx: projectile.vfx });
         projectile.hit[o.id] = true;
         if (!projectile.pierce) {
@@ -129,7 +130,7 @@ export function updateProjectiles(state: GameState, dt: number) {
 
     if (dead) {
       if (projectile.split) splitProjectile(state, projectile, spawned);
-      if (projectile.leaveZone) state.zones.push(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone));
+      if (projectile.leaveZone) state.zones.push(Object.assign(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone), { srcSlot: projectile.srcSlot }));
       continue;
     }
     // 投射物撞可破壞物
@@ -140,7 +141,7 @@ export function updateProjectiles(state: GameState, dt: number) {
     }
     if (dead) {
       if (projectile.split) splitProjectile(state, projectile, spawned);
-      if (projectile.leaveZone) state.zones.push(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone));
+      if (projectile.leaveZone) state.zones.push(Object.assign(makeZone(projectile.owner, projectile.x, projectile.y, projectile.leaveZone), { srcSlot: projectile.srcSlot }));
       continue;
     }
     keep.push(projectile);

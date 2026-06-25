@@ -127,6 +127,7 @@ export function makeProjectile(owner: EntityId, x: number, y: number, vx: number
     freezeBonus: opt.freezeBonus || 0,
     vfx: opt.vfx || null,
     heal: opt.heal || 0,
+    srcSlot: opt.srcSlot != null ? opt.srcSlot : null,
     hit: {},
   };
 }
@@ -147,6 +148,7 @@ export function makeZone(owner: EntityId, x: number, y: number, opt: Record<stri
     drainHeal: opt.drainHeal || 0,
     allyHeal: opt.allyHeal || 0,
     vfx: opt.vfx || null,
+    srcSlot: opt.srcSlot != null ? opt.srcSlot : null,
   };
 }
 

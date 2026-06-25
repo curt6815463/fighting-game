@@ -30,7 +30,7 @@ export function buff(ctx: ActionContext) {
     }
   }
   if (action.effect) applyEffect(caster, action.effect.kind, action.effect);
-  if (action.trail) caster.trail = { remaining: action.trail.duration || 3, spacing: action.trail.spacing || 42, lastx: caster.x, lasty: caster.y, zone: action.trail.zone };
+  if (action.trail) caster.trail = { remaining: action.trail.duration || 3, spacing: action.trail.spacing || 42, lastx: caster.x, lasty: caster.y, zone: action.trail.zone, srcSlot: ctx.source };
   if (!silent) {
     addFx(state, {
       type: 'buff',

@@ -22,9 +22,9 @@ export function blink(ctx: ActionContext) {
       knockback: action.knockback || 0,
       effect: action.effect,
       detonate: action.detonate,
-    }, true);
+    }, true, ctx.source);
   }
-  if (action.leaveZone) state.zones.push(makeZone(caster.id, caster.x, caster.y, action.leaveZone));
+  if (action.leaveZone) state.zones.push(Object.assign(makeZone(caster.id, caster.x, caster.y, action.leaveZone), { srcSlot: ctx.source }));
   if (!silent) addFx(state, { type: 'blink', x: caster.x, y: caster.y, facing: caster.facing, range: action.range, color: action.color, life: 0.3, radius: action.hitRadius || PLAYER_RADIUS * 1.6, vfx: action.vfx });
 }
 

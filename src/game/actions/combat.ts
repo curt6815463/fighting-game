@@ -26,9 +26,11 @@ export function outMult(p: Player, a: any): number {
   return m;
 }
 
-export function applyEffectFrom(state: GameState, target: Player, effect: any, srcId: EntityId) {
+export function applyEffectFrom(state: GameState, target: Player, effect: any, srcId: EntityId, source?: string | null) {
   let e = effect;
   const src = state.players[srcId];
+  // DPS 歸因：DoT 記住來源 slot（呼叫端 source 優先，否則回退施法者同步施放期的 _srcSlot）。
+  const srcSlot = source != null ? source : (src && src._srcSlot != null ? src._srcSlot : null);
   if (src && effect.kind === 'burn') {
     const t = getCharacter(src.charId).talent;
     if (t && t.id === 'pyromancy') {
@@ -45,11 +47,11 @@ export function applyEffectFrom(state: GameState, target: Player, effect: any, s
   }
   // 孵化寄生：再補一箭 → 先引爆既有寄生（依累積量），再植入全新一隻。
   if (e.kind === 'parasite' && target.effects && target.effects.parasite) hatchParasite(state, target);
-  applyEffect(target, e.kind, e, srcId);
+  applyEffect(target, e.kind, srcSlot != null ? { ...e, srcSlot } : e, srcId);
 }
 
 // 近戰揮击：扱弧內所有敵人（full arc 不限角）。a 可為合成動作物件（leap/blink 內部套用）。
-export function meleeHit(state: GameState, p: Player, a: any, silent?: boolean) {
+export function meleeHit(state: GameState, p: Player, a: any, silent?: boolean, source?: string | null) {
   const m = outMult(p, a);
   const full = a.arc >= 6;
   for (const o of Object.values(state.players)) {
@@ -68,9 +70,9 @@ export function meleeHit(state: GameState, p: Player, a: any, silent?: boolean) 
       addFx(state, { type: 'hit', x: o.x, y: o.y, color: a.color, life: 0.26, radius: 64, vfx: a.vfx });
     }
     if (a.execute && o.hp <= o.maxHp * (a.execute.threshold || 0.25)) dmg *= a.execute.mult || 5;
-    dealDamage(state, o, dmg, p.id, { meleeHit: true });
+    dealDamage(state, o, dmg, p.id, { meleeHit: true, source });
     if (a.knockback && d > 0) { o.kvx += (dx / d) * a.knockback; o.kvy += (dy / d) * a.knockback; }
-    if (a.effect) applyEffectFrom(state, o, a.effect, p.id);
+    if (a.effect) applyEffectFrom(state, o, a.effect, p.id, source);
   }
   if (!silent) addFx(state, { type: 'melee', x: p.x, y: p.y, facing: p.facing, range: a.range, arc: full ? 7 : a.arc, color: a.color, life: 0.18, vfx: a.vfx });
 }

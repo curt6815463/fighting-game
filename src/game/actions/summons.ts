@@ -45,7 +45,7 @@ export function summonMinions(state: GameState, summoner: Player, action: Action
     state.players[id] = m;
     addFx(state, { type: 'blink', x, y, color: action.color, life: 0.42, radius: 64, vfx: action.vfx });
   }
-  if (action.zone) state.zones.push(makeZone(summoner.id, summoner.x, summoner.y, action.zone));
+  if (action.zone) state.zones.push(Object.assign(makeZone(summoner.id, summoner.x, summoner.y, action.zone), { srcSlot: summoner._srcSlot }));
 }
 
 function detonateMinions(state: GameState, summoner: Player, action: ActionDef) {

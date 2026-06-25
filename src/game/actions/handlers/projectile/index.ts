@@ -29,6 +29,7 @@ export function projectile(ctx: ActionContext) {
       freezeBonus: action.freezeBonus || 0,
       vfx: projVfx,
       heal: (action as any).heal,
+      srcSlot: ctx.source,
     }));
   }
 }

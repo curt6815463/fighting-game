@@ -137,6 +137,7 @@ export interface Projectile {
   leaveZone?: any | null;    // 落點留下 zone（煙幕等）
   freezeBonus: number;
   vfx?: string | null;
+  srcSlot?: string | null;   // DPS 歸因：建立此投射物的技能 slot
   hit: Record<string, boolean>; // 已命中目標（防 pierce 重複打）
   [key: string]: any;
 }
@@ -160,6 +161,7 @@ export interface Zone {
   drainHeal: number;         // 命中數 × 回血
   allyHeal: number;          // 每 tick 對圈內友方回血
   vfx?: string | null;
+  srcSlot?: string | null;   // DPS 歸因：建立此區域的技能 slot
   [key: string]: any;
 }
 

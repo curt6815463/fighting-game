@@ -15,6 +15,7 @@ export function channel(ctx: ActionContext) {
     effect: action.effect || null,
     color: action.color,
     vfx: action.vfx,
+    srcSlot: ctx.source,
   };
   if (!silent) {
     addFx(state, {

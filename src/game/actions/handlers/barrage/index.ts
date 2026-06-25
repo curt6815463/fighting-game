@@ -20,6 +20,7 @@ export function barrage(ctx: ActionContext) {
     color: action.color,
     vfx: action.vfx,
     effect: action.effect || null,
+    srcSlot: ctx.source,
   };
 }
 

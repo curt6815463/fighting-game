@@ -15,6 +15,7 @@ export function grapple(ctx: ActionContext) {
     effect: action.effect,
     pull: { gap: action.gap || 26 },
     vfx: action.vfx,
+    srcSlot: ctx.source,
   }));
   if (!silent) addFx(state, { type: 'dash', x: caster.x, y: caster.y, facing: caster.facing, color: action.color, life: 0.2, vfx: action.vfx });
 }

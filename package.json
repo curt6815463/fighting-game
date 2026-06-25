@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "dps": "RUN_DPS=1 vitest run test/dps.test.ts --reporter=basic"
   },
   "dependencies": {
     "peerjs": "1.5.4",

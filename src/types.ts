@@ -80,6 +80,27 @@ export interface BossRunStats {
   mvpId: string | null;
 }
 
+// 練功房（傷害測試）即時統計：controller 每 ~0.15s 推送一次。
+export interface TrainingSkillRow {
+  slot: string;   // basic/skill1/skill2/ultimate/evade/summon/dot/reflect/other
+  dmg: number;
+  dps: number;
+  pct: number;    // 0~1，佔總輸出比例
+}
+export interface TrainingStatsView {
+  charId: string;
+  charName: string;
+  elapsed: number;     // 秒（自上次重置起算）
+  total: number;       // 累計輸出傷害
+  dps: number;
+  dmgTaken: number;    // 累計承受傷害（木人還手時）
+  maxHit: number;
+  critCount: number;
+  skillUses: Record<string, number>;
+  perSkill: TrainingSkillRow[]; // 依傷害高→低排序
+  retaliate: boolean;
+}
+
 // 角色資料：characters.js 為 .js，這裡描述 UI 會用到的欄位。
 export interface SkillMeta {
   name: string;
@@ -122,6 +143,7 @@ export interface ControllerEvents {
   menuStatus: (msg: string, isError: boolean) => void;
   lobbyStatus: (msg: string) => void;
   gameover: (view: GameOverView) => void;
+  trainingStats: (view: TrainingStatsView | null) => void;
 }
 
 // React → Controller 下達的指令。
@@ -140,6 +162,10 @@ export interface GameController {
   startBossChallenge(round: number): void;
   devStartGame(charId?: string): void;
   devStartBoss(charId?: string, round?: number): void;
+  startTraining(charId?: string, opts?: { retaliate?: boolean }): void;
+  resetTrainingStats(): void;
+  setTrainingRetaliate(on: boolean): void;
+  quitTraining(): void;
   returnToLobby(): void;
   bossRetry(): void;
   bossQuit(): void;

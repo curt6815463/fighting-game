@@ -109,6 +109,8 @@ export interface ActionOpts {
   silent?: boolean;
   chargeFactor?: number;
   chargeRatio?: number;
+  /** DPS 歸因：施放此動作的技能 slot（basic/skill1/skill2/ultimate/evade）。 */
+  source?: string;
   [key: string]: any;
 }
 
@@ -134,6 +136,7 @@ export interface ActionContext {
   chargeRatio: number;      // 0..1 蓄力進度
   cos: number;              // Math.cos(caster.facing)，避免各 handler 重算
   sin: number;
+  source: string | null;    // DPS 歸因：施放此動作的技能 slot（無則 null）
 }
 
 export type ActionHandler = (ctx: ActionContext) => void;

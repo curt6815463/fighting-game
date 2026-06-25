@@ -12,6 +12,7 @@ export function zone(ctx: ActionContext) {
     for (let i = 0; i < precalc.length; i++) {
       const pos = precalc[i];
       const z = makeZone(caster.id, pos.x, pos.y, action);
+      z.srcSlot = ctx.source;
       if (action.delay) z.delay += i * (action.stagger || 0.16);
       state.zones.push(z);
     }
@@ -31,7 +32,9 @@ export function zone(ctx: ActionContext) {
   const n = action.count || 1;
   if (n <= 1) {
     const zopt = action.moving ? { ...action, vx: cos * action.moving, vy: sin * action.moving } : action;
-    state.zones.push(makeZone(caster.id, baseX, baseY, zopt));
+    const z = makeZone(caster.id, baseX, baseY, zopt);
+    z.srcSlot = ctx.source;
+    state.zones.push(z);
   } else {
     const scatter = action.scatter || 120;
     for (let i = 0; i < n; i++) {
@@ -44,6 +47,7 @@ export function zone(ctx: ActionContext) {
         zy = clamp(baseY + Math.sin(ang) * rr, PLAYER_RADIUS, ARENA.height - PLAYER_RADIUS);
       }
       const z = makeZone(caster.id, zx, zy, action);
+      z.srcSlot = ctx.source;
       if (action.delay) z.delay += i * (action.stagger || 0.16);
       state.zones.push(z);
     }

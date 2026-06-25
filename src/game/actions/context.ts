@@ -25,6 +25,7 @@ export function createActionContext(
     chargeRatio: opts.chargeRatio || 0,
     cos: Math.cos(caster.facing),
     sin: Math.sin(caster.facing),
+    source: opts.source != null ? opts.source : null,
   };
 }
 

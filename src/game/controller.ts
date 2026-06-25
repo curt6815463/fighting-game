@@ -28,16 +28,17 @@
 import { createRenderer } from './renderer.js';
 import { createNetwork, makeRoomCode } from './network.js';
 import { createInput, EMPTY_INPUT } from './input.js';
-import { createInitialState } from './entities.js';
+import { createInitialState, makePlayer } from './entities.js';
 import { CHARACTERS } from './characters.js';
 import { getBossForRound } from './bosses.js';
 import { startBossRound, retryBossRound, quitBossRun } from './bossMode.js';
 import { step } from './simulation.ts';
 import { serializeNetworkSnapshot } from './network/snapshot';
 import { buildBossStats } from './controller/bossStats';
+import { setupStats, summarizeDps } from './entities/stats.ts';
 import { createPrediction } from './controller/prediction';
 import { createCamera } from './controller/camera';
-import { DT, SNAPSHOT_INTERVAL, INPUT_INTERVAL, MAX_PLAYERS } from './constants.js';
+import { ARENA, DT, SNAPSHOT_INTERVAL, INPUT_INTERVAL, MAX_PLAYERS } from './constants.js';
 import type {
   ControllerEvents,
   ControlScheme,
@@ -71,6 +72,7 @@ function createController(): GameController {
     menuStatus: new Set(),
     lobbyStatus: new Set(),
     gameover: new Set(),
+    trainingStats: new Set(),
   };
   function on<K extends keyof ControllerEvents>(event: K, fn: ControllerEvents[K]) {
     listeners[event].add(fn);
@@ -102,7 +104,7 @@ function createController(): GameController {
   let running = false;
   let wantLoop = false;            // 想啟動迴圈但等待 canvas 掛上
   let gameoverSent = false;
-  let accumulator = 0, snapAcc = 0, inputAcc = 0, snapSeq = 0;
+  let accumulator = 0, snapAcc = 0, inputAcc = 0, snapSeq = 0, trainEmitAcc = 0;
   let lastLogic = 0;
   let lastRender = 0;
   let logicTimer: ReturnType<typeof setInterval> | null = null;
@@ -270,6 +272,24 @@ function createController(): GameController {
       accumulator += dt;
       let guard = 0;
       while (accumulator >= DT && guard < 8) { step(gameState, inputs, DT); accumulator -= DT; guard++; if (perf) perf.steps++; }
+
+      // 練功房維生：木人與玩家皆 god mode（木人穩定承傷不死、玩家持續輸出不中斷），
+      // 並節流推送即時 DPS / 各技能佔比給 React overlay。
+      if (gameState.mode === 'training') {
+        const dummy = gameState.players[gameState.trainingDummyId];
+        if (dummy) {
+          dummy.hp = dummy.maxHp; dummy.alive = true;
+          if (!dummy.isNpc) {
+            // 靜止木人：固定原地、清擊退，免被推走（還手模式交給 NPC AI 自由移動）。
+            dummy.x = gameState.trainingDummyX; dummy.y = gameState.trainingDummyY;
+            dummy.vx = 0; dummy.vy = 0; dummy.kvx = 0; dummy.kvy = 0;
+          }
+        }
+        const meP = gameState.players[selfId as string];
+        if (meP) { meP.hp = meP.maxHp; meP.alive = true; }
+        trainEmitAcc += dt;
+        if (trainEmitAcc >= 0.15) { trainEmitAcc = 0; emitTrainingStats(); }
+      }
 
       snapAcc += dt;
       // 快照走「不可靠 / 不排序」通道 (broadcastSnapshot)：state 是 latest-wins,允許掉包/亂序,
@@ -512,6 +532,86 @@ function createController(): GameController {
     startBossSession(round, 'campaign');
   }
 
+  // ---------- 練功房 / 傷害測試（單機本地：玩家 vs 不死木人，即時 DPS / 各技能輸出佔比）----------
+  const TRAIN_DUMMY_ID = 'dummy';
+  const TRAIN_DUMMY_HP = 1e9;
+
+  // 非近戰角色當乾淨木人：避開「近戰受擊 ×0.85」與多數減傷天賦，給所有角色一致基準。
+  function trainingDummyChar(): string {
+    const c = CHARACTERS.find((x: any) => !x.meleeRole);
+    return (c || CHARACTERS[0]).id;
+  }
+
+  function emitTrainingStats() {
+    if (!gameState || gameState.mode !== 'training') return;
+    const view = summarizeDps(gameState, selfId as string) || {
+      elapsed: 0, total: 0, dps: 0, dmgTaken: 0, maxHit: 0, critCount: 0, skillUses: {}, perSkill: [],
+    };
+    const dummy = gameState.players[TRAIN_DUMMY_ID];
+    const meP = gameState.players[selfId as string];
+    emit('trainingStats', {
+      ...view,
+      charId: selectedChar,
+      charName: (meP && meP.name) || '',
+      retaliate: !!(dummy && dummy.isNpc),
+    } as any);
+  }
+
+  function startTraining(charId?: string, opts: { retaliate?: boolean } = {}) {
+    myName = '練習';
+    role = 'host';
+    selfId = 'train-' + Math.random().toString(36).slice(2, 9);
+    roomCode = 'TRAIN';
+    const me: string = charId && CHARACTERS.some((c: any) => c.id === charId) ? charId : selectedChar;
+    selectedChar = me;
+    lobby = [{ id: selfId, name: myName, charId: me, controlScheme: selectedControlScheme, isHost: true, team: 1 }];
+
+    gameState = createInitialState([{ id: selfId, name: myName, charId: me, team: 1 }], gameFlags, { mode: 'training' });
+
+    // 木人樁：team 2、巨血、置於玩家右側。預設靜止承傷；retaliate=true 交給 NPC AI 還手。
+    const cx = ARENA.width / 2, cy = ARENA.height / 2;
+    const dummy = makePlayer(TRAIN_DUMMY_ID, '木人樁', trainingDummyChar(), cx + 170, cy, 2);
+    dummy.maxHp = TRAIN_DUMMY_HP; dummy.hp = TRAIN_DUMMY_HP;
+    dummy.isDummy = true;
+    if (opts.retaliate) dummy.isNpc = true;
+    gameState.players[TRAIN_DUMMY_ID] = dummy;
+    gameState.trainingDummyId = TRAIN_DUMMY_ID;
+    gameState.trainingDummyX = cx + 170;
+    gameState.trainingDummyY = cy;
+
+    const meP = gameState.players[selfId];
+    if (meP) { meP.x = cx; meP.y = cy; meP.facing = 0; }
+
+    setupStats(gameState);
+    for (const id of Object.keys(gameState.players)) inputs[id] = { ...EMPTY_INPUT };
+    trainEmitAcc = 0;
+    beginLoop();
+    emitTrainingStats();
+  }
+
+  function resetTrainingStats() {
+    if (role !== 'host' || !gameState || gameState.mode !== 'training') return;
+    setupStats(gameState); // 重建 perPlayer/perSkill，runStart=當前 time（歸零累計）
+    emitTrainingStats();
+  }
+
+  function setTrainingRetaliate(on: boolean) {
+    if (!gameState || gameState.mode !== 'training') return;
+    const d = gameState.players[TRAIN_DUMMY_ID];
+    if (!d) return;
+    d.isNpc = !!on;
+    if (!on) { inputs[TRAIN_DUMMY_ID] = { ...EMPTY_INPUT }; d.effects = {}; d.x = ARENA.width / 2 + 170; d.y = ARENA.height / 2; }
+    emitTrainingStats();
+  }
+
+  function quitTraining() {
+    stopLoop();
+    input.disable();
+    gameState = null;
+    emit('trainingStats', null as any);
+    emit('phase', 'menu');
+  }
+
   function bossRetry() {
     if (role !== 'host' || !gameState) return;
     retryBossRound(gameState);
@@ -579,6 +679,10 @@ function createController(): GameController {
     startBossChallenge,
     devStartGame,
     devStartBoss,
+    startTraining,
+    resetTrainingStats,
+    setTrainingRetaliate,
+    quitTraining,
     returnToLobby,
     bossRetry,
     bossQuit,

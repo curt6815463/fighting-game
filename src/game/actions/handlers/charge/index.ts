@@ -17,6 +17,7 @@ export function charge(ctx: ActionContext) {
     wallStun: action.wallStun || 0,
     color: action.color,
     vfx: action.vfx,
+    srcSlot: ctx.source,
     hit: {},
   };
   if (!silent) addFx(state, { type: 'dash', x: caster.x, y: caster.y, facing: caster.facing, color: action.color, life: 0.25, vfx: action.vfx });

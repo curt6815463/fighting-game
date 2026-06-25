@@ -1,16 +1,21 @@
 // 主選單：名稱輸入、建立房間、輸入房號加入。
 
 import { useState } from 'react';
+import { CHARACTERS } from '../game/characters.js';
 
 interface MenuScreenProps {
   status: { msg: string; isError: boolean };
   onCreate: (name: string) => void;
   onJoin: (name: string, code: string) => void;
+  onTraining: (charId: string) => void;
 }
 
-export function MenuScreen({ status, onCreate, onJoin }: MenuScreenProps) {
+const ROSTER = (CHARACTERS as any[]).map((c) => ({ id: c.id, name: c.name }));
+
+export function MenuScreen({ status, onCreate, onJoin, onTraining }: MenuScreenProps) {
   const [name, setName] = useState('');
   const [room, setRoom] = useState('');
+  const [trainChar, setTrainChar] = useState<string>(ROSTER[0]?.id ?? 'warrior');
 
   // 名稱留空時自動產生隨機名（沿用舊版行為）。
   function resolveName() {
@@ -46,6 +51,19 @@ export function MenuScreen({ status, onCreate, onJoin }: MenuScreenProps) {
             <button className="btn" onClick={() => onJoin(resolveName(), room.trim())}>加入房間</button>
           </div>
         </div>
+
+        <div className="training-row" style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.12)' }}>
+          <select
+            value={trainChar}
+            onChange={(e) => setTrainChar(e.target.value)}
+            style={{ flex: 1, padding: '8px', borderRadius: 8 }}
+            aria-label="練功房角色"
+          >
+            {ROSTER.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button className="btn" onClick={() => onTraining(trainChar)}>🎯 練功房（傷害測試）</button>
+        </div>
+        <p className="dim" style={{ fontSize: 12, marginTop: 4 }}>單機練功房：對不死木人測試 DPS 與各技能輸出佔比，可即時換角、重置。</p>
 
         <p className={'status' + (status.isError ? ' error' : '')}>{status.msg}</p>
 

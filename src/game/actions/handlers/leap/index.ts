@@ -21,6 +21,7 @@ export function leap(ctx: ActionContext) {
     leaveZone: action.leaveZone || null,
     color: action.color,
     vfx: action.vfx,
+    srcSlot: ctx.source,
   };
   if (!silent) addFx(state, { type: 'dash', x: caster.x, y: caster.y, facing: caster.facing, color: action.color, life: 0.25, vfx: action.vfx });
 }

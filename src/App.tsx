@@ -10,7 +10,8 @@ import { LobbyScreen } from './components/LobbyScreen';
 import { GameScreen } from './components/GameScreen';
 import { GameOverScreen } from './components/GameOverScreen';
 import { AudioSettingsButton } from './components/AudioSettingsButton';
-import type { AppPhase, ControlScheme, GameFlags, GameOverView, LobbyView } from './types';
+import { TrainingOverlay } from './components/TrainingOverlay';
+import type { AppPhase, ControlScheme, GameFlags, GameOverView, LobbyView, TrainingStatsView } from './types';
 
 const EMPTY_LOBBY: LobbyView = { players: [], selfId: null, isHost: false, roomCode: '', gameFlags: { freeMana: false, noCooldown: false, noDamage: false, difficulty: 0.5 } };
 
@@ -21,6 +22,7 @@ export function App() {
   const [menuStatus, setMenuStatus] = useState<{ msg: string; isError: boolean }>({ msg: '', isError: false });
   const [lobbyStatus, setLobbyStatus] = useState('');
   const [gameover, setGameover] = useState<GameOverView | null>(null);
+  const [trainingStats, setTrainingStats] = useState<TrainingStatsView | null>(null);
   const [selectedChar, setSelectedChar] = useState<string>(controller.selectedChar);
   const [selectedControlScheme, setSelectedControlScheme] = useState<ControlScheme>('wasd-jkl');
   const [selectedTeam, setSelectedTeam] = useState(0);
@@ -32,6 +34,7 @@ export function App() {
       controller.on('menuStatus', (msg, isError) => setMenuStatus({ msg, isError })),
       controller.on('lobbyStatus', setLobbyStatus),
       controller.on('gameover', setGameover),
+      controller.on('trainingStats', setTrainingStats),
     ];
     return () => offs.forEach((off) => off());
   }, [controller]);
@@ -98,6 +101,7 @@ export function App() {
             status={menuStatus}
             onCreate={(name) => controller.createRoom(name)}
             onJoin={(name, code) => controller.joinRoom(name, code)}
+            onTraining={(charId) => controller.startTraining(charId)}
           />
         );
       case 'lobby':
@@ -139,6 +143,7 @@ export function App() {
   return (
     <>
       {renderScreen()}
+      {trainingStats && phase === 'game' && <TrainingOverlay stats={trainingStats} controller={controller} />}
       <AudioSettingsButton />
     </>
   );

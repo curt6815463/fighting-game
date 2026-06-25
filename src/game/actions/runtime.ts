@@ -26,7 +26,7 @@ export function processScripted(state: GameState, p: Player, dt: number): boolea
     for (const o of Object.values(state.players)) {
       if (!isEnemy(state, p.id, o) || c.hit[o.id]) continue;
       if (dist(p.x, p.y, o.x, o.y) <= c.hitRadius + bodyR(o)) {
-        if (c.dmg) dealDamage(state, o, c.dmg, p.id);
+        if (c.dmg) dealDamage(state, o, c.dmg, p.id, { source: c.srcSlot });
         if (c.knockback) {
           const dx = o.x - p.x;
           const dy = o.y - p.y;
@@ -34,7 +34,7 @@ export function processScripted(state: GameState, p: Player, dt: number): boolea
           o.kvx += dx / d * c.knockback;
           o.kvy += dy / d * c.knockback;
         }
-        if (c.effect) applyEffectFrom(state, o, c.effect, p.id);
+        if (c.effect) applyEffectFrom(state, o, c.effect, p.id, c.srcSlot);
         c.hit[o.id] = true;
         hitSomeone = true;
       }
@@ -63,9 +63,9 @@ export function processScripted(state: GameState, p: Player, dt: number): boolea
     p.vx = 0;
     p.vy = 0;
     if (k >= 1) {
-      meleeHit(state, p, { dmg: l.dmg, range: l.radius, arc: 7, knockback: l.knockback, effect: l.effect, vfx: l.vfx }, false);
+      meleeHit(state, p, { dmg: l.dmg, range: l.radius, arc: 7, knockback: l.knockback, effect: l.effect, vfx: l.vfx }, false, l.srcSlot);
       addFx(state, { type: 'hit', x: p.x, y: p.y, color: l.color, life: 0.3, radius: l.radius, vfx: l.vfx });
-      if (l.leaveZone) state.zones.push(makeZone(p.id, p.x, p.y, l.leaveZone));
+      if (l.leaveZone) state.zones.push(Object.assign(makeZone(p.id, p.x, p.y, l.leaveZone), { srcSlot: l.srcSlot }));
       p.leap = null;
     }
     return true;
@@ -104,9 +104,9 @@ export function processChannel(state: GameState, p: Player, dt: number) {
   if (ch.tickTimer <= 0) {
     ch.tickTimer += ch.tick;
     if (target) {
-      dealDamage(state, target, ch.dmg, p.id);
+      dealDamage(state, target, ch.dmg, p.id, { source: ch.srcSlot });
       if (ch.heal) applyHeal(state, p, ch.heal);
-      if (ch.effect) applyEffectFrom(state, target, ch.effect, p.id);
+      if (ch.effect) applyEffectFrom(state, target, ch.effect, p.id, ch.srcSlot);
       addFx(state, { type: 'hit', x: target.x, y: target.y, color: ch.color, life: 0.2, radius: 20, vfx: ch.vfx });
     }
   }
@@ -118,7 +118,7 @@ export function processTrail(state: GameState, p: Player, dt: number) {
   if (!tr) return;
   tr.remaining -= dt;
   if (dist(p.x, p.y, tr.lastx, tr.lasty) >= tr.spacing) {
-    state.zones.push(makeZone(p.id, p.x, p.y, tr.zone));
+    state.zones.push(Object.assign(makeZone(p.id, p.x, p.y, tr.zone), { srcSlot: tr.srcSlot }));
     tr.lastx = p.x;
     tr.lasty = p.y;
   }
@@ -147,6 +147,7 @@ export function processBarrage(state: GameState, p: Player, dt: number) {
       pierce: b.pierce,
       effect: b.effect,
       vfx: b.vfx,
+      srcSlot: b.srcSlot,
     }));
     // 槍口閃光
     addFx(state, { type: 'hit', x: p.x + c * PLAYER_RADIUS, y: p.y + s * PLAYER_RADIUS, color: b.color, life: 0.12, radius: b.radius * 1.4, vfx: b.vfx });

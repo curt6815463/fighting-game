@@ -69,6 +69,7 @@ export function startStarOrbitBurst(ctx: ActionContext) {
     knockback: ctx.action.knockback || 0,
     color: ctx.action.color || '#ffd166',
     vfx: ctx.action.vfx,
+    srcSlot: ctx.source,
   };
   orbit.shards = 0;
 }
@@ -107,6 +108,7 @@ function tickBurst(state: any, p: Player, orbit: any, dt: number) {
       vfx: burst.vfx,
       shards: isFinal ? 3 : pulseIndex + 1,
       final: isFinal,
+      srcSlot: burst.srcSlot,
     });
     burst.pulsesLeft -= 1;
     burst.timer += burst.interval;
@@ -128,7 +130,7 @@ function resolveBeam(state: any, p: Player, beam: any) {
     if (forward < -bodyR(o) || forward > beam.range + bodyR(o)) continue;
     const side = Math.abs(dx * -sin + dy * cos);
     if (side > beam.width + bodyR(o)) continue;
-    dealDamage(state, o, beam.dmg, p.id);
+    dealDamage(state, o, beam.dmg, p.id, { source: beam.srcSlot });
     if (beam.knockback) {
       o.kvx += cos * beam.knockback;
       o.kvy += sin * beam.knockback;

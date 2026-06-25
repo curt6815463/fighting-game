@@ -94,7 +94,7 @@ export function hatchParasite(state: GameState, host: Player) {
     if (srcId != null && o.id === srcId) continue; // 不打施法者
     const isHost = o.id === host.id;
     if (!isHost && (!isEnemy(state, srcId, o) || Math.hypot(o.x - host.x, o.y - host.y) > radius)) continue;
-    if (burst > 0) dealDamage(state, o, burst, srcId, { dot: true });
+    if (burst > 0) dealDamage(state, o, burst, srcId, { dot: true, source: par.srcSlot });
     // 擴散弱化寄生（只由主寄生 store>0 觸發；擴散出的 store=0 不再二次擴散）。
     if (!isHost && par.store > 0 && o.alive) {
       applyEffect(o, 'parasite', {
@@ -130,7 +130,7 @@ export function dealDamage(
   target: Player,
   amount: number,
   attackerId: EntityId,
-  opts: { noTalent?: boolean; noReflect?: boolean; meleeHit?: boolean; dot?: boolean } = {},
+  opts: { noTalent?: boolean; noReflect?: boolean; meleeHit?: boolean; dot?: boolean; source?: string | null } = {},
 ) {
   if (!target.alive || amount <= 0) return;
   if (target.effects && target.effects.evading) return;
@@ -186,14 +186,14 @@ export function dealDamage(
 
   if (!opts.noReflect && hostile && target.effects && target.effects.reflect) {
     const reflectDamage = dmg * (target.effects.reflect.factor || 0);
-    if (reflectDamage > 0) dealDamage(state, attacker, reflectDamage, target.id, { noReflect: true, noTalent: true });
+    if (reflectDamage > 0) dealDamage(state, attacker, reflectDamage, target.id, { noReflect: true, noTalent: true, source: 'reflect' });
   }
   if (!opts.noReflect && hostile) {
     const tt = getCharacter(target.charId).talent;
     const th = tt && getTalentHooks(tt.id);
     if (th?.onAttacked) {
       const reflectDamage = th.onAttacked(talentCtx(state, attacker, target, dmg, tt));
-      if (reflectDamage && reflectDamage > 0) dealDamage(state, attacker, reflectDamage, target.id, { noReflect: true, noTalent: true });
+      if (reflectDamage && reflectDamage > 0) dealDamage(state, attacker, reflectDamage, target.id, { noReflect: true, noTalent: true, source: 'reflect' });
     }
   }
 
@@ -313,7 +313,14 @@ export function dealDamage(
 
   const isCrit = dmg >= amount * 1.35 || dmg >= 30;
   addFx(state, { type: 'popup', x: target.x, y: target.y, color: isCrit ? '#ffd166' : '#ff5050', life: 0.85, text: Math.round(dmg), kind: isCrit ? 'crit' : 'damage' });
-  recordDamage(state, attackerId, target, dmg, { isCrit });
+  // DPS 歸因來源：召喚物傷害一律歸 'summon'；否則優先用明確 opts.source（deferred 實體標籤），
+  // 其次同步施放期的 attacker._srcSlot（executor 設定），最後 DoT→'dot'、不明→'other'。
+  let dmgSource: string;
+  if (attacker && (attacker.isMinion || attacker.isSummon)) dmgSource = 'summon';
+  else if (opts.source != null) dmgSource = opts.source;
+  else if (attacker && attacker._srcSlot != null) dmgSource = attacker._srcSlot;
+  else dmgSource = opts.dot ? 'dot' : 'other';
+  recordDamage(state, attackerId, target, dmg, { isCrit, source: dmgSource });
 
   if (hostile && attacker.effects && attacker.effects.lifesteal) {
     const lifesteal = dmg * (attacker.effects.lifesteal.factor || 0);
