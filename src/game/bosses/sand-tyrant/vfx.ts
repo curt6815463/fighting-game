@@ -6,6 +6,38 @@ import { slashBlade, cone, burst, ring, column, sphereFlash } from '../../render
 
 const SAND = '#dfc48c', GOLD = '#ffd700', DUST = '#a68d60', PURPLE = '#c050ff';
 
+// 流沙漩渦貼圖：中心暗陷沙坑 → 外圈亮沙 → 邊緣透明，疊三條交錯螺旋臂（旋轉即成漩渦）。快取。
+let _qsTex: any = null;
+function quicksandTex() {
+  if (_qsTex) return _qsTex;
+  const S = 256;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const x = c.getContext('2d');
+  const cx = S / 2, cy = S / 2, R = S / 2;
+  const rg = x.createRadialGradient(cx, cy, 0, cx, cy, R);
+  rg.addColorStop(0.0, 'rgba(64,50,30,0.96)');     // 暗陷沙坑
+  rg.addColorStop(0.45, 'rgba(150,124,76,0.9)');
+  rg.addColorStop(0.82, 'rgba(205,180,124,0.85)'); // 亮沙
+  rg.addColorStop(1.0, 'rgba(205,180,124,0)');     // 邊緣柔化
+  x.fillStyle = rg; x.beginPath(); x.arc(cx, cy, R, 0, 7); x.fill();
+  x.lineCap = 'round';
+  for (let arm = 0; arm < 3; arm++) {
+    x.strokeStyle = arm % 2 ? 'rgba(236,214,160,0.55)' : 'rgba(86,68,42,0.5)';
+    x.lineWidth = 6;
+    x.beginPath();
+    for (let s = 0; s <= 64; s++) {
+      const t = s / 64;
+      const ang = arm * (6.283 / 3) + t * 6.283 * 1.5;   // 1.5 圈螺旋
+      const rr = R * 0.1 + t * R * 0.84;
+      const px = cx + Math.cos(ang) * rr, py = cy + Math.sin(ang) * rr;
+      s === 0 ? x.moveTo(px, py) : x.lineTo(px, py);
+    }
+    x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  _qsTex = t; return t;
+}
+
 export function loadVfx() {
   // 普攻：沙塵彈發射與擊中
   registerVfx('boss_sand_bolt', {
@@ -18,53 +50,58 @@ export function loadVfx() {
     }
   });
 
-  // 技能一：流沙漩渦 (Quicksand Pool)
+  // 技能一：流沙漩渦 (Quicksand Pool) — 螺旋沙面緩轉 + 內陷深坑反向快轉 + 揚塵亮環 + 向心旋入的沙粒。
   registerVfx('boss_sand_pool', {
     zone(ctx, z) {
       const R = z.radius || 150;
       const g = new THREE.Group();
-      
-      // 地面流沙底面
-      const sandBase = new THREE.Mesh(
-        new THREE.CircleGeometry(R, 24),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(DUST), transparent: true, opacity: 0.65, side: THREE.DoubleSide, depthWrite: false })
+      const tex = quicksandTex();
+      // 漩渦沙面（螺旋貼圖，緩轉）
+      const swirl = new THREE.Mesh(
+        new THREE.CircleGeometry(R, 40),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.9, depthWrite: false, side: THREE.DoubleSide })
       );
-      sandBase.rotation.x = -Math.PI / 2;
-      sandBase.position.y = 0.4;
-      g.add(sandBase);
-
-      // 旋轉流沙花紋環
-      const ringMesh = new THREE.Mesh(
-        new THREE.RingGeometry(R * 0.8, R * 0.95, 24),
-        new THREE.MeshBasicMaterial({ color: new THREE.Color(SAND), transparent: true, opacity: 0.8, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending })
+      swirl.rotation.x = -Math.PI / 2; swirl.position.y = 0.4; g.add(swirl);
+      // 內陷深坑（暗、較小、反向快轉 → 吞噬感）
+      const pit = new THREE.Mesh(
+        new THREE.CircleGeometry(R * 0.52, 32),
+        new THREE.MeshBasicMaterial({ map: tex, color: new THREE.Color(0x6a5836), transparent: true, opacity: 0.78, depthWrite: false })
       );
-      ringMesh.rotation.x = -Math.PI / 2;
-      ringMesh.position.y = 0.6;
-      g.add(ringMesh);
+      pit.rotation.x = -Math.PI / 2; pit.position.y = 0.5; g.add(pit);
+      // 揚塵亮環（加法、脈動）
+      const rim = new THREE.Mesh(
+        new THREE.RingGeometry(R * 0.88, R * 1.02, 40),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(SAND), transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide })
+      );
+      rim.rotation.x = -Math.PI / 2; rim.position.y = 0.55; g.add(rim);
 
       let t = 0, em = 0;
       return {
         object3D: g,
         update(dt) {
           t += dt;
-          ringMesh.rotation.z -= dt * 1.6; // 旋動
+          swirl.rotation.z -= dt * 0.95;
+          pit.rotation.z += dt * 1.9;
+          rim.material.opacity = 0.42 + 0.22 * Math.sin(t * 3.2);
           em -= dt;
           if (em <= 0) {
-            em = 0.05;
+            em = 0.035;
+            // 表面沙粒：切向旋 + 微向心 + 短命 → 被漩渦捲吸的感覺
             const a = Math.random() * 6.283;
-            const rr = Math.random() * R * 0.82;
+            const rr = R * (0.42 + Math.random() * 0.55);
+            const tang = 60, inward = 24;
             ctx.particles.spawn({
               x: g.position.x + Math.cos(a) * rr,
-              y: 1.2,
+              y: 1.0,
               z: g.position.z + Math.sin(a) * rr,
-              vx: -Math.sin(a) * 45, // 漩渦切向速度
-              vy: 6 + Math.random() * 12,
-              vz: Math.cos(a) * 45,
-              gravity: 1,
-              drag: 1.1,
-              life: 0.6 + Math.random() * 0.4,
-              size: 2.2 + Math.random() * 2.5,
-              color: Math.random() < 0.35 ? GOLD : SAND,
+              vx: -Math.sin(a) * tang - Math.cos(a) * inward,
+              vy: 2 + Math.random() * 4,
+              vz: Math.cos(a) * tang - Math.sin(a) * inward,
+              gravity: 6,
+              drag: 1.25,
+              life: 0.45 + Math.random() * 0.35,
+              size: 1.6 + Math.random() * 2.2,
+              color: Math.random() < 0.3 ? GOLD : SAND,
               fade: true
             });
           }

@@ -347,31 +347,50 @@ function buildFloor() {
   apron.receiveShadow = true;
   g.add(apron);
 
-  // 有機苔蘚地 (mossy)：延遲建立並快取，避免無謂開銷
-  let organicAlbedo = null, apronTex = null;
+  // 自然地面：mossy/organic = 苔泥；sand = 風吹沙丘（暖金沙、風紋波痕、沙丘明暗、無格線）。
+  // 皆延遲建立並快取，避免無謂開銷。
+  let organicAlbedo = null, apronTex = null, sandAlbedo = null, sandApronTex = null;
   function applyStyle(theme) {
     const style = (theme && theme.floorStyle) || 'tiled';
-    if (style === 'mossy' || style === 'organic') {
-      if (!organicAlbedo) {
-        organicAlbedo = organicGroundTexture();
-        organicAlbedo.wrapS = organicAlbedo.wrapT = THREE.RepeatWrapping;
-        organicAlbedo.repeat.set(3, 2);
-        organicAlbedo.anisotropy = 8;
+    if (style === 'mossy' || style === 'organic' || style === 'sand') {
+      let albedo, apron;
+      if (style === 'sand') {
+        if (!sandAlbedo) {
+          sandAlbedo = sandDuneTexture();
+          sandAlbedo.wrapS = sandAlbedo.wrapT = THREE.RepeatWrapping;
+          sandAlbedo.repeat.set(3, 2);
+          sandAlbedo.anisotropy = 8;
+        }
+        if (!sandApronTex) {
+          sandApronTex = sandAlbedo.clone();
+          sandApronTex.wrapS = sandApronTex.wrapT = THREE.RepeatWrapping;
+          sandApronTex.repeat.set(16, 16);
+          sandApronTex.needsUpdate = true;
+        }
+        albedo = sandAlbedo; apron = sandApronTex;
+      } else {
+        if (!organicAlbedo) {
+          organicAlbedo = organicGroundTexture();
+          organicAlbedo.wrapS = organicAlbedo.wrapT = THREE.RepeatWrapping;
+          organicAlbedo.repeat.set(3, 2);
+          organicAlbedo.anisotropy = 8;
+        }
+        if (!apronTex) {
+          apronTex = organicAlbedo.clone();
+          apronTex.wrapS = apronTex.wrapT = THREE.RepeatWrapping;
+          apronTex.repeat.set(16, 16);
+          apronTex.needsUpdate = true;
+        }
+        albedo = organicAlbedo; apron = apronTex;
       }
-      mat.map = organicAlbedo;
+      mat.map = albedo;
       mat.roughnessMap = null;
       mat.roughness = 1.0;
       mat.metalness = 0.0;
       mat.color.setHex(theme.floorTint != null ? theme.floorTint : 0xffffff);
       ring.visible = false;
-      // 外延地坪沿用同一張有機貼圖 (大平鋪，略暗讓視線往外沉)
-      if (!apronTex) {
-        apronTex = organicAlbedo.clone();
-        apronTex.wrapS = apronTex.wrapT = THREE.RepeatWrapping;
-        apronTex.repeat.set(16, 16);
-        apronTex.needsUpdate = true;
-      }
-      apronMat.map = apronTex;
+      // 外延地坪沿用同一張貼圖 (大平鋪，略暗讓視線往外沉)
+      apronMat.map = apron;
       apronMat.color.setHex(theme.outerGround != null ? theme.outerGround : 0x7e8268);
     } else {
       mat.map = tiledAlbedo;
@@ -436,6 +455,57 @@ function organicGroundTexture() {
     for (let s = 0; s < segs; s++) { a += (Math.random() - 0.5) * 1.2; cx += Math.cos(a) * (15 + Math.random() * 28); cy += Math.sin(a) * (15 + Math.random() * 28); x.lineTo(cx, cy); }
     x.stroke();
   }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+// 風吹沙丘 albedo：暖金沙底 + 沙丘明暗起伏 + 風紋波痕（正弦整數頻→無縫平鋪）+ 細沙顆粒 + 稀疏裸露硬地。無格線、非磚。
+function sandDuneTexture() {
+  const S = 512;
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const x = c.getContext('2d');
+  x.fillStyle = '#c4a36a';
+  x.fillRect(0, 0, S, S);
+  // 大面積柔邊色斑 (wrap 平鋪 3x3 讓邊界連續)：沙丘受光面 / 背光陰影
+  const blob = (cols, n, rmin, rmax, amax) => {
+    for (let i = 0; i < n; i++) {
+      const px = Math.random() * S, py = Math.random() * S;
+      const r = rmin + Math.random() * (rmax - rmin);
+      const col = cols[(Math.random() * cols.length) | 0];
+      for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) {
+        const grd = x.createRadialGradient(px + dx, py + dy, 0, px + dx, py + dy, r);
+        grd.addColorStop(0, `rgba(${col},${(0.1 + Math.random() * amax).toFixed(2)})`);
+        grd.addColorStop(1, `rgba(${col},0)`);
+        x.fillStyle = grd;
+        x.beginPath(); x.arc(px + dx, py + dy, r, 0, 7); x.fill();
+      }
+    }
+  };
+  blob(['216,189,134', '198,170,116', '230,205,150'], 20, 70, 185, 0.3); // 受光沙丘亮面
+  blob(['150,120,76', '130,102,64'], 16, 60, 165, 0.28);                 // 背光沙丘陰影
+  // 風紋波痕：橫向波浪線（正弦整數頻→水平無縫），亮稜 + 緊鄰暗槽，堆疊成沙的條紋肌理
+  const rows = 22;
+  for (let r = 0; r < rows; r++) {
+    const baseY = (r + 0.5) / rows * S;
+    const freq = 2 + (r % 3);                    // 整數頻率 → 左右接續無縫
+    const amp = 6 + Math.random() * 10;
+    const phase = Math.random() * Math.PI * 2;
+    for (const [dy, col, al, lw] of [[0, '236,214,160', 0.16, 2.4], [3.4, '150,120,74', 0.13, 2.0]]) {
+      x.strokeStyle = `rgba(${col},${al})`; x.lineWidth = lw; x.lineCap = 'round';
+      x.beginPath();
+      for (let px = 0; px <= S; px += 6) {
+        const py = baseY + dy + Math.sin(px / S * Math.PI * 2 * freq + phase) * amp;
+        if (px === 0) x.moveTo(px, py); else x.lineTo(px, py);
+      }
+      x.stroke();
+    }
+  }
+  // 細沙顆粒
+  for (let i = 0; i < 2600; i++) { const v = 175 + (Math.random() * 55 | 0); x.fillStyle = `rgba(${v},${v - 22},${v - 58},0.05)`; x.fillRect(Math.random() * S, Math.random() * S, 2, 2); }
+  // 稀疏裸露硬地暗斑（少量點綴，增加變化、非裂網）
+  blob(['120,96,60', '100,80,50'], 4, 40, 85, 0.22);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

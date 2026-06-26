@@ -4,6 +4,7 @@ import { SLOW, STUN } from '../effects.js';
 import { aiProfile } from './ai.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { loadVfx } from './vfx.ts';
+import { arena } from './arena.ts';
 import './action.ts'; // Ensure custom sand_blink action is registered
 import { ARENA } from '../../constants.js';
 import { addFx } from '../../entities/fx.ts';
@@ -38,27 +39,8 @@ const data = {
   ],
   hazardText: '⚠️ 站在流沙中！快離開',
   hazardColor: '#dfc48c',
-  theme: {
-    sky: 0x2b221a,
-    fog: 0x3d3025,
-    fogNear: 600,
-    fogFar: 2200,
-    floor: 0x8a7355,
-    ring: 0xdfc48c,
-    wallStone: 0x4d3b2c,
-    wallTrim: 0xdfc48c,
-    hemiSky: 0xdfc48c,
-    hemiGround: 0x2b221a,
-    hemiInt: 0.5,
-    sunColor: 0xffebad,
-    sunInt: 2.0,
-    rimColor: 0xdfc48c,
-    rimInt: 0.4,
-    decorations: ['rock'],
-    rock: { count: 18, color: 0x5c4a38 },
-    atmosphere: { kind: 'embers', color: '#dfc48c', rate: 20 },
-    floorDecal: { kind: 'rings', color: '#dfc48c', opacity: 0.4, glow: 0.2 },
-  },
+  // 場地（黃沙砂暴遺跡主題，無魔法陣）定義於 ./arena.ts
+  theme: arena.theme,
   phases: [
     {
       hpPct: 0.5,
