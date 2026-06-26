@@ -55,7 +55,7 @@ export interface ArenaTheme {
   sky?: number; fog?: number; fogNear?: number; fogFar?: number;
   // 地板
   floor?: number; ring?: number;
-  floorStyle?: 'tiled' | 'mossy' | 'organic' | 'sand';
+  floorStyle?: 'tiled' | 'mossy' | 'organic' | 'flagstone' | 'sand';
   floorTint?: number; outerGround?: number;
   // 邊界牆
   wallStone?: number; wallTrim?: number;
@@ -75,7 +75,9 @@ export interface ArenaTheme {
   // ---- 內建共用道具的設定（值由對應 builder 解讀；boss 專屬道具的設定可用同名 key）----
   tree?: any; rock?: any; crystal?: any; pillar?: any; brazier?: any;
   ruins?: any; temple?: any; roots?: any; foliage?: any; godrays?: any; groundcover?: any;
-  // boss 專屬道具設定（搭配 props 的同名 builder）：風沙法皇的金砂漩渦 / 黑岩尖石 / 金字塔 / 綠洲。
+  // boss 專屬道具設定（搭配 props 的同名 builder）：
+  // 劇毒飛蜥的石砌祭壇/毒池環/蛇紋石王座/立桿火把；風沙法皇的金砂漩渦/黑岩尖石/金字塔/綠洲。
+  dais?: any; pools?: any; throne?: any; torches?: any;
   vortices?: any; spires?: any; pyramid?: any; oasis?: any;
 }
 
