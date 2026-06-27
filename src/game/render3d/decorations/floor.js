@@ -3,6 +3,7 @@
 
 import * as THREE from 'three';
 import { ARENA } from '../../constants.js';
+import { LOW_GPU } from '../quality.js';
 
 // 程序生成地面圖案貼圖。
 //   kinds: 'arcane' 法陣 / 'cracks' 裂縫 / 'hex' 六角網格 / 'rings' 同心圓 /
@@ -164,6 +165,8 @@ export function makeFloorPattern(kind, color, scale = 1) {
 // 由 theme.floorDecal 建立中央地刻 Mesh。回傳 null 表示無地刻。
 // userData 帶 decalMat/glowBase/pulse 供 updateDecorationFade 做呼吸發光。
 export function buildFloorDecal(theme) {
+  // 手機關閉中央地刻：大片半透明 + 自發光平面蓋住整個場中央，是 overdraw 重災區。
+  if (LOW_GPU) return null;
   const dc = theme.floorDecal;
   if (!dc) return null;
   const tex = makeFloorPattern(dc.kind, dc.color, dc.scale);

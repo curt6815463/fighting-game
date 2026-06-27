@@ -45,11 +45,15 @@ export function createSceneManager(canvas) {
   scene.fog = new THREE.Fog(BG, 1400, 2900);
 
   // ---- 影像式環境光 (IBL)：金屬/盔甲真實反射 ----
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  const envScene = new RoomEnvironment();
-  scene.environment = pmrem.fromScene(envScene, 0.04).texture;
-  if ('environmentIntensity' in scene) scene.environmentIntensity = 0.45;
-  envScene.dispose();
+  // 手機關閉：env map 取樣是每個 PBR 像素的固定成本，整片畫面都是 PBR 材質時很傷 GPU
+  // (真機實測 cpu 僅 3-4ms、gpu/wait 60ms+ → 純 GPU/fill-rate 綁死)。改只吃 hemi+dir 光。
+  if (!constrainedGpu) {
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const envScene = new RoomEnvironment();
+    scene.environment = pmrem.fromScene(envScene, 0.04).texture;
+    if ('environmentIntensity' in scene) scene.environmentIntensity = 0.45;
+    envScene.dispose();
+  }
 
   const camera = new THREE.PerspectiveCamera(52, 16 / 9, 1, 8000);
   // 固定全場框取 (不跟隨)；拉近視角；俯視傾斜更陡

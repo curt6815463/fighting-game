@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { ARENA } from '../../../constants.js';
 import { scatterPositions, makeInstanced } from '../helpers.js';
+import { LOW_GPU } from '../../quality.js';
 
 // 發光晶體：高瘦多面體 + emissive。
 export function buildCrystals(theme) {
@@ -64,6 +65,8 @@ function shaftTexture() {
 
 // 神殿光束 (god-ray)：加法混色錐柱，自樹冠灑下；微閃爍 + 緩慢自轉 (見 updateDecorationFade)。
 export function buildLightShafts(theme) {
+  // 手機關閉神殿光束：加法混色錐柱是大面積 overdraw，對 fill-rate 綁死的手機很傷。
+  if (LOW_GPU) return new THREE.Group();
   const cfg = theme.godrays || {};
   const count = cfg.count || 6;
   const color = new THREE.Color(cfg.color || 0xcdeb9f);
