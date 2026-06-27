@@ -739,19 +739,17 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
           setStyle(lookBase, 'bottom', '290px');
           setStyle(lookBase, 'opacity', '0.4');
           setStyle(lookBase, 'transform', 'scale(0.95)');
-          lookTouchId = null;
           if (hooks.input && hooks.input.setTouchLook) hooks.input.setTouchLook(0, 0);
         }
         
         if (!showControls && wasShown) {
           // Reset joystick position visually
           setStyle(joystickKnob, 'transform', 'translate(0px, 0px)');
-          setStyle(joystickBase, 'left', restOffset + 'px');
+          setStyle(joystickBase, 'left', '35px');
           setStyle(joystickBase, 'top', 'auto');
-          setStyle(joystickBase, 'bottom', restOffset + 'px');
+          setStyle(joystickBase, 'bottom', '35px');
           setStyle(joystickBase, 'opacity', '0.4');
           setStyle(joystickBase, 'transform', 'scale(0.95)');
-          joystickTouchId = null;
           
           // Clear logical inputs to prevent stuck movement/actions
           if (hooks.input) {
