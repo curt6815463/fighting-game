@@ -725,7 +725,6 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
           setStyle(lookBase, 'bottom', '290px');
           setStyle(lookBase, 'opacity', '0.4');
           setStyle(lookBase, 'transform', 'scale(0.95)');
-          lookTouchId = null;
           if (hooks.input && hooks.input.setTouchLook) hooks.input.setTouchLook(0, 0);
         }
         
@@ -737,8 +736,6 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
           setStyle(joystickBase, 'bottom', restOffset + 'px');
           setStyle(joystickBase, 'opacity', '0.4');
           setStyle(joystickBase, 'transform', 'scale(0.95)');
-          joystickTouchId = null;
-          
           // Clear logical inputs to prevent stuck movement/actions
           if (hooks.input) {
             if (hooks.input.setTouchDirection) hooks.input.setTouchDirection(0, 0);
