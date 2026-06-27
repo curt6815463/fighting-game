@@ -34,6 +34,7 @@ const FRAG = /* glsl */`
 
 export function createParticleSystem(scene, opt = {}) {
   const CAP = opt.capacity || 5000;
+  const SIZE_SCALE = opt.sizeScale || 1;   // 手機降粒子尺寸 → 減少加法混色 overdraw（戰鬥時的 fill-rate 大頭）
 
   // 粒子狀態 (平行陣列，swap-remove 壓實)
   const px = new Float32Array(CAP), py = new Float32Array(CAP), pz = new Float32Array(CAP);
@@ -131,7 +132,7 @@ export function createParticleSystem(scene, opt = {}) {
       // 火花：尺寸隨壽命縮小；alpha 線性
       let a = lf;
       if (fade[i]) a = lf * lf; // 尾端更快淡出
-      aSize[i] = baseSize[i] * (0.35 + 0.65 * lf);
+      aSize[i] = baseSize[i] * (0.35 + 0.65 * lf) * SIZE_SCALE;
       aAlpha[i] = a;
     }
     geo.setDrawRange(0, n);

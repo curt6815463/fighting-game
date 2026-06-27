@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { createSceneManager } from './render3d/scene.js';
 import { createParticleSystem } from './render3d/particles.js';
+import { LOW_GPU } from './render3d/quality.js';
 import { createEntityLayer } from './render3d/entities3d.js';
 import { createFxBus } from './render3d/fxbus.js';
 import { createHud } from './render3d/hud.js';
@@ -50,7 +51,9 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl', hooks = {}) {
   const sceneMgr = createSceneManager(canvas);
   const { scene, camera } = sceneMgr;
 
-  const particles = createParticleSystem(scene, { capacity: 5000 });
+  // 手機：粒子上限 5000→2000 + 尺寸 0.8，砍戰鬥時加法混色 overdraw（實測戰鬥 15fps、閒置 100fps，
+  // 瓶頸是 active VFX 的 fill-rate，不是場景/draw call）。
+  const particles = createParticleSystem(scene, { capacity: LOW_GPU ? 2000 : 5000, sizeScale: LOW_GPU ? 0.8 : 1 });
   particles.setDpr(sceneMgr.renderer.getPixelRatio());
   // getEntityPos：給特效查某實體「render 端平滑後的場景座標」（如忍者千影分身跟隨移動中的目標）。
   // models 在下方才宣告，但此 closure 僅於每幀繪製時呼叫（屆時 models 已初始化）。
