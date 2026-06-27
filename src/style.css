@@ -1084,8 +1084,8 @@ code { background: #0e1722; padding: 3px 9px; border-radius: 6px; color: var(--a
   border: 2px solid rgba(255, 255, 255, 0.12);
   border-radius: 50%;
   box-shadow: inset 0 0 10px rgba(255, 255, 255, 0.05), 0 6px 20px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* 不要加 backdrop-filter：常駐在 live WebGL canvas 上的元件每幀都會重新模糊背景，
+     手機是 GPU/compositing 殺手（真機實測 cpu 僅 4ms 但 gpu/wait 60ms+、整場掉到 ~15fps）。 */
   pointer-events: none;
   opacity: 0.4;
   transform: scale(0.95);
@@ -1129,8 +1129,8 @@ code { background: #0e1722; padding: 3px 9px; border-radius: 6px; color: var(--a
   border: 2px solid rgba(130, 220, 240, 0.18);
   border-radius: 50%;
   box-shadow: inset 0 0 10px rgba(130, 220, 240, 0.06), 0 6px 20px rgba(0, 0, 0, 0.4);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* 不要加 backdrop-filter：常駐在 live WebGL canvas 上的元件每幀都會重新模糊背景，
+     手機是 GPU/compositing 殺手（真機實測 cpu 僅 4ms 但 gpu/wait 60ms+、整場掉到 ~15fps）。 */
   pointer-events: none;
   opacity: 0.4;
   transform: scale(0.95);
@@ -1190,8 +1190,8 @@ code { background: #0e1722; padding: 3px 9px; border-radius: 6px; color: var(--a
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.45);
   border: 2px solid rgba(255, 255, 255, 0.12);
   background: rgba(45, 55, 72, 0.75);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  /* 不要加 backdrop-filter：常駐在 live WebGL canvas 上的元件每幀都會重新模糊背景，
+     手機是 GPU/compositing 殺手（真機實測 cpu 僅 4ms 但 gpu/wait 60ms+、整場掉到 ~15fps）。 */
   transition: transform 0.05s ease, border-color 0.15s, background 0.15s;
   overflow: hidden;
 }
