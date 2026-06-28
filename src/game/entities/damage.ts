@@ -27,7 +27,7 @@ import type { GameState, Player, EntityId } from '../types';
 // onTimers(iaido 計時) / onRecovery(lifebloom 回血) / onCastResolved(timeprism)。
 //
 // 仍內聯、尚未納入 registry 的天賦邏輯（aura / 跨實體 / 與施放序列緊密耦合）：
-//   • entities/damage.ts   warsongFor()(warsong aura) / spreadCurse()(plague 死亡傳染) /
+//   • entities/damage.ts   warsongFor()(warsong aura) / spreadTimehex()(causality 死亡傳染+回沖CD) /
 //                          summonbond 召喚物命中回主（owner 經召喚物，非攻擊方天賦）
 //   • systems/effects.ts      undeath(DoT 汲取回血，見 dotLifesteal)
 //   • actions/combat.ts       pyromancy(強化 burn) ；actions/casting.ts iaido 居合就緒判定
@@ -60,22 +60,33 @@ function warsongFor(state: GameState, attacker: Player): number {
   return best;
 }
 
-function spreadCurse(state: GameState, corpse: Player) {
-  let hexer: Player | null = null;
+// 時厄術士 天賦「因果」：帶時咒的敵人死亡 → 剩餘時咒（半數層）擴散給周圍敵人，
+// 並回沖時厄術士自身的技能冷卻（節奏引擎）。掃描全場找帶 causality 天賦者。
+function spreadTimehex(state: GameState, corpse: Player) {
+  let mage: Player | null = null;
   for (const other of Object.values(state.players)) {
     if (!other.alive) continue;
     const talent = getCharacter(other.charId).talent;
-    if (talent && talent.id === 'plague') { hexer = other; break; }
+    if (talent && talent.id === 'causality') { mage = other; break; }
   }
-  if (!hexer) return;
-  const weaken = corpse.effects.weaken;
-  if (!weaken) return;
-  const radius = (getCharacter(hexer.charId).talent.radius) || 200;
+  if (!mage) return;
+  const hex = corpse.effects.timehex;
+  if (!hex) return;
+  const mt = getCharacter(mage.charId).talent;
+  const radius = mt.radius || 220;
+  const half = Math.max(1, Math.ceil((hex.stacks || 1) / 2));
   for (const other of Object.values(state.players)) {
-    if (other.id === corpse.id || !isEnemy(state, hexer.id, other)) continue;
-    if (Math.hypot(other.x - corpse.x, other.y - corpse.y) <= radius) applyEffect(other, 'weaken', { duration: weaken.remaining, factor: weaken.factor });
+    if (other.id === corpse.id || !isEnemy(state, mage.id, other)) continue;
+    if (Math.hypot(other.x - corpse.x, other.y - corpse.y) <= radius) {
+      applyEffect(other, 'timehex', { stacks: half, duration: hex.remaining, vulnPer: hex.vulnPer, dmgPerStack: hex.dmgPerStack }, mage.id);
+    }
   }
-  addFx(state, { type: 'buff', x: corpse.x, y: corpse.y, color: '#bb6bd9', life: 0.4, radius, vfx: 'hexer_field' });
+  // 節奏引擎：回沖技能冷卻（縮短 skill1/skill2/ultimate）
+  const refund = mt.cdRefund || 1.5;
+  if (mage.cd) for (const slot of ['skill1', 'skill2', 'ultimate']) {
+    if (mage.cd[slot] > 0) mage.cd[slot] = Math.max(0, mage.cd[slot] - refund);
+  }
+  addFx(state, { type: 'buff', x: corpse.x, y: corpse.y, color: '#b07cff', life: 0.4, radius, vfx: 'chronohex_field' });
 }
 
 // 孵化寄生引爆：對宿主與半徑內敵人造成累積爆傷，並把弱化寄生擴散到附近敵人。
@@ -177,6 +188,7 @@ export function dealDamage(
   if (target.isBoss) dmg = applyBossDamageModifiers(state, target, attacker, dmg);
   if (target.effects && target.effects.mark) dmg *= 1 + target.effects.mark.bonus;
   if (target.effects && target.effects.parasite) dmg *= 1 + (target.effects.parasite.vuln || 0);
+  if (target.effects && target.effects.timehex) dmg *= 1 + (target.effects.timehex.stacks || 0) * (target.effects.timehex.vulnPer || 0.04);
   // 破綻窗口：Boss / 部位 (含 owner Boss 的破綻) 收招期間受傷 +30% (重招破綻 +45%)
   if (hostile && target.isBoss && (target.recoverWindow || 0) > 0) {
     dmg *= target.recoverHeavy ? 1.45 : 1.3;
@@ -374,7 +386,7 @@ export function dealDamage(
     }
     recordKill(state, attackerId, target);
     recordDeath(state, target);
-    if (target.effects && target.effects.weaken) spreadCurse(state, target);
+    if (target.effects && target.effects.timehex) spreadTimehex(state, target);
     if (target.effects && target.effects.parasite) hatchParasite(state, target);
     const bossDeathVfx = target.isBoss && state.mode === 'boss' ? getBoss(target.charId as number)?.data?.deathVfx : null;
     if (!bossDeathVfx) {

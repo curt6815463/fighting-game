@@ -18,7 +18,7 @@ export function tickCharacterTimers(state: GameState, p: Player, character: any,
   if (character.ultimate && character.ultimate.rewindSelf) {
     if (!p._chronoHist) p._chronoHist = [];
     p._chronoHist.push({ x: p.x, y: p.y, hp: p.hp });
-    if (p._chronoHist.length > 130) p._chronoHist.shift();
+    if (p._chronoHist.length > 150) p._chronoHist.shift();
   }
   getTalentHooks(talent?.id)?.onTimers?.(state, p, dt, talent); // 例：iaido 計時累積
   if (typeof character.tick === 'function') character.tick(state, p, dt);
@@ -28,6 +28,9 @@ export function tickCooldowns(state: GameState, p: Player, talent: any, dt: numb
   let cdRate = 1;
   const cooldownRate = getTalentHooks(talent?.id)?.cooldownRate; // 例：bloodlust 失血加速
   if (cooldownRate) cdRate = cooldownRate(state, p, talent);
+  // 時咒（時厄術士）：被咒時技能/閃避冷卻流速降低（每層 cdSlowPer，最多 −50%）—— 惱人控制。
+  const th = p.effects && p.effects.timehex;
+  if (th && th.stacks > 0) cdRate *= Math.max(0.5, 1 - th.stacks * (th.cdSlowPer || 0.07));
   cdRate /= COOLDOWN_MULTIPLIER;
   cdRate /= difficultyMult(state.flags.difficulty ?? 0.5).playerCd;
   for (const slot of COOLDOWN_SLOTS) {

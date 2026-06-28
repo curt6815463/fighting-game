@@ -112,6 +112,34 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
       };
     },
   },
+  // 時咒（時厄術士專屬）：堆疊式時空詛咒。每層 →
+  //   ・承受傷害 +vulnPer（易傷，結算於 damage.ts）
+  //   ・每 tick 蝕傷 stacks×dmgPerStack（低，結算於 systems/effects.ts；DPS 不高）
+  //   ・**技能冷卻流速 −cdSlowPer/層**（惱人：被咒時技能/閃避回得更慢，結算於 playerState.tickCooldowns）
+  // 爆發來自「引爆」：快轉引爆（chronoaccel）或大招奇點清算（chronocollapse）。
+  // 疊加 = 加層 + 刷新持續、取較高參數。
+  timehex: {
+    cleanseable: true,
+    hud: { icon: '⌛', name: '時咒', buff: false },
+    apply: (p, _k, data, srcId) => {
+      const cur = p.effects.timehex;
+      const max = data.max || 5;
+      const addStacks = data.stacks != null ? data.stacks : 1; // 允許 stacks:0（純刷新持續，不加層）
+      const stacks = Math.min(max, (cur ? cur.stacks : 0) + addStacks);
+      const tick = data.tick || 0.5;
+      p.effects.timehex = {
+        remaining: data.duration || 6,
+        stacks, max,
+        vulnPer: data.vulnPer != null ? data.vulnPer : (cur ? cur.vulnPer : 0.04),
+        dmgPerStack: Math.max(cur ? cur.dmgPerStack : 0, data.dmgPerStack || 1),
+        cdSlowPer: data.cdSlowPer != null ? data.cdSlowPer : (cur ? cur.cdSlowPer : 0.07),
+        tick,
+        tickTimer: cur ? cur.tickTimer : tick,
+        srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
+        srcSlot: data.srcSlot != null ? data.srcSlot : (cur ? cur.srcSlot : undefined),
+      };
+    },
+  },
   mark: {
     cleanseable: true,
     hud: { icon: '🎯', name: '標記', buff: false },
@@ -168,6 +196,7 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
   stun: { cleanseable: true, hud: { icon: '💫', name: '暈眩', buff: false } },
   frozen: { cleanseable: true, hud: { icon: '🧊', name: '冰凍', buff: false } },
   blind: { cleanseable: true, hud: { icon: '🌚', name: '致盲', buff: false } },
+  scramble: { cleanseable: true, hud: { icon: '🌀', name: '錯亂', buff: false } }, // 移動方向反轉（movement.ts），CC 冷卻 6s
 
   // ---- 增益（不被淨化）----
   reflect: { hud: { icon: '🪞', name: '反射', buff: true }, apply: (p, _k, data) => { p.effects.reflect = { remaining: data.duration || 5, factor: data.factor || 0.35 }; } },

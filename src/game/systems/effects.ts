@@ -77,6 +77,15 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
         poisonLifesteal(state, effect.srcId, dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#7ee787', life: 0.3, radius: PLAYER_RADIUS });
       }
+    } else if (kind === 'timehex') {
+      // 時咒：每 tick 依層數蝕傷（stacks × dmgPerStack），時間在啃食目標。
+      effect.tickTimer -= dt;
+      if (effect.tickTimer <= 0) {
+        effect.tickTimer += effect.tick;
+        const dmg = (effect.stacks || 1) * (effect.dmgPerStack || 1);
+        dealDamage(state, p, dmg, effect.srcId, { dot: true, source: effect.srcSlot });
+        addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#b07cff', life: 0.3, radius: PLAYER_RADIUS });
+      }
     } else if (kind === 'parasite') {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {

@@ -46,6 +46,7 @@ describe('talent hook registry', () => {
   it('registers damage-pipeline hooks for migrated talents', () => {
     expect(CHARACTERS.length).toBeGreaterThan(0); // 確保 glob 已載入觸發 talent 註冊
     expect(getTalentHooks('virulence')?.modifyOutgoing).toBeTypeOf('function'); // 刺客 (原 lethal → 改劇毒增傷)
+    expect(getTalentHooks('causality')?.modifyOutgoing).toBeTypeOf('function'); // 時厄術士 (帶時咒目標增傷)
     expect(getTalentHooks('deadeye')?.modifyOutgoing).toBeTypeOf('function');
     expect(getTalentHooks('summonbond')?.modifyIncoming).toBeTypeOf('function');
     expect(getTalentHooks('arcane_flow')?.onDealt).toBeTypeOf('function');
@@ -57,7 +58,6 @@ describe('talent hook registry', () => {
     expect(getTalentHooks('bloodlust')?.cooldownRate).toBeTypeOf('function');
     expect(getTalentHooks('lifebloom')?.onRecovery).toBeTypeOf('function');
     expect(getTalentHooks('iaido')?.onTimers).toBeTypeOf('function');
-    expect(getTalentHooks('timeprism')?.onCastResolved).toBeTypeOf('function');
   });
 });
 

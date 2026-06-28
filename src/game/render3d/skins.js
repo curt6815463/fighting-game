@@ -38,13 +38,12 @@ const CHAR_SLUGS = [
   'elementalist',
   'fighter',
   'paladin',
-  'hexer',
+  'chronohex',
   'bard',
   'samurai',
   'gunner',
   'summoner',
   'necromancer',
-  'chronomancer',
 ];
 
 // charId -> 檔案格式
