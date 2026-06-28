@@ -218,8 +218,28 @@ def normalize(x, peak=0.9):
         return x
     return x / m * peak
 
-def finalize(x, peak=0.9, fade_out=12.0):
-    return fade(normalize(x, peak), 2.0, fade_out)
+# 感知響度正規化：以「中頻(350Hz–6kHz)能量」為準，而非峰值。
+# 原因：戰士/衝擊類能量多在 <300Hz sub-bass，筆電/手機喇叭放不出來、耳朵也較不敏感，
+# 用 peak 正規化會「峰高但聽起來很小聲」。改用中頻 RMS 對齊 → 每個音聽起來一樣響。
+TARGET_MID_RMS = 0.16  # 中頻目標響度（提高＝整體更大聲）
+
+def mid_rms(x):
+    return float(np.sqrt(np.mean(spec_filter(x, hp=350, lp=6000) ** 2)))
+
+def soft_limit(x, ceiling=0.97, drive=1.12):
+    # tanh 軟限幅：把峰壓進 ceiling，同時增加密度與諧波（含 sub 的諧波→小喇叭也聽得到低頻衝擊）。
+    return np.tanh(x / ceiling * drive) * ceiling
+
+def finalize(x, fade_out=12.0, loud=1.0, max_gain=6.0):
+    x = fade(np.asarray(x, dtype=float), 2.0, fade_out)
+    m = mid_rms(x)
+    if m > 1e-6:
+        x = x * min(max_gain, TARGET_MID_RMS * loud / m)
+    x = soft_limit(x, 0.97)
+    peak = np.max(np.abs(x))
+    if peak > 0.985:
+        x *= 0.985 / peak
+    return x
 
 # ── 常用組件（重量導向）──
 
@@ -593,158 +613,233 @@ def shadow_strike(name, dur=0.3):
 
 # ── 大招 / 多段（合成式） ──
 
-def ult_release(name, dur, flavor_layer, charge_pitch=1.0, charge_frac=0.42, hp=120):
-    """通用大招外殼：蓄力上掃 → 釋放重擊 + flavor_layer（已是 rest 長度的陣列）。"""
+# 電影感組件：張力鋪陳(riser) 與 巨型衝擊(boom)，讓大招「蓄勢 → 砸下」更浮誇。
+def riser(name, dur, f0=150, f1=3000, gain=1.0):
+    """上升張力：噪音掃頻 up + 鋸齒上揚；尾段最強（自然帶入衝擊）。"""
+    nz = tv_bandpass(noise(dur, name, 'ri'), glide(f0, f1, dur), q=1.3) * swell(dur, 0.88, 0.12, 2.4)
+    tone = spec_filter(osc(glide(f0 * 0.7, f1 * 0.45, dur), dur, 'saw'), lp=f1) * swell(dur, 0.9, 0.1) * 0.3
+    return mix(nz * 0.5, tone) * gain
+
+def boom(name, dur=0.7, sub=1.0, crack=0.7, flavor=None):
+    """巨型衝擊：深 sub-drop + 中頻捶擊(胸口頻段，小喇叭也聽得到) + body + 高頻 crack + flavor。"""
+    sd = (osc(glide(170, 32, dur), dur, 'sine') * perc(dur, 0.002, dur * 0.45)
+          + osc(glide(85, 26, dur), dur, 'sine') * perc(dur, 0.004, dur * 0.55) * 0.7) * sub
+    body = body_thump(name, dur * 0.6, 150, 44, 0.8, 0.4)
+    knock = spec_filter(noise(dur * 0.45, name, 'bk'), hp=180, lp=1200) * perc(dur * 0.45, 0.001, 0.06) * 0.7  # 中頻捶擊感
+    knock = mix(knock, osc(glide(320, 110, dur * 0.4), dur * 0.4, 'tri') * perc(dur * 0.4, 0.001, dur * 0.18) * 0.5)
+    cr = spec_filter(noise(dur * 0.5, name, 'bc'), hp=700, lp=12000) * perc(dur * 0.5, 0.0006, 0.05) * crack
+    layers = [sd, body, knock, cr]
+    if flavor is not None:
+        layers.append(to_len(flavor, n_samp(dur)))
+    return softclip(mix(*layers), 1.7)
+
+def ult_release(name, dur, flavor_layer, charge_pitch=1.0, charge_frac=0.4, hp=60, sub=1.0, crack=0.7):
+    """通用大招外殼：riser 蓄勢 → boom 砸下（flavor 落在衝擊瞬間）。"""
     cd = dur * charge_frac
     rest = dur - cd
-    charge = tv_bandpass(noise(cd, name, 'uc'), glide(150, 1800 * charge_pitch, cd), q=1.6) * swell(cd, 0.7, 0.3, 2.0) * 0.5
-    charge = mix(charge, spec_filter(osc(glide(110, 440 * charge_pitch, cd), cd, 'saw') * swell(cd, 0.8, 0.2) * 0.3, lp=3000))
-    boom = body_thump(name, rest, 150, 45, 1.0, 0.4)
-    crack = spec_filter(noise(rest * 0.5, name, 'ub'), hp=1000, lp=12000) * perc(rest * 0.5, 0.0008, 0.04) * 0.7
-    release = mix(boom, crack, to_len(flavor_layer, n_samp(rest)))
-    full = mix(charge, place(release, cd, dur))
-    return reverb(softclip(full, 1.6), 0.5, 0.28, name, hp=hp)
+    pre = riser(name, cd, 140, 2600 * charge_pitch) * 0.55
+    hd = min(0.85, rest)
+    hit = boom(name, hd, sub=sub, crack=crack, flavor=to_len(np.asarray(flavor_layer, float), n_samp(hd)))
+    full = mix(place(pre, 0, dur), place(hit, cd, dur))
+    return reverb(softclip(full, 1.6), 0.6, 0.32, name, hp=hp)
 
-def rising_dragon(name, dur=1.05):
-    cd = dur * 0.45
+def rising_dragon(name, dur=1.2):
+    # 真·昇龍霸：蓄力上掃 → 騰空巨型上勾拳衝擊 + 龍吟。
+    cd = dur * 0.4
     rest = dur - cd
-    rise = whoosh(name, cd, 150, 2000, down=False, q=2.2) * 0.6
-    charge = osc(glide(120, 500, cd), cd, 'saw') * swell(cd, 0.7, 0.3) * 0.3
-    impact = mix(body_thump(name, rest, 160, 45, 1.0, 0.4), lowmid_impact(name, rest, 180, 1000, 0.7, 0.1),
-                 spec_filter(noise(rest, name, 'rd'), hp=800, lp=9000) * perc(rest, 0.001, 0.05) * 0.5)
-    roar = spec_filter(osc(glide(180, 120, rest), rest, 'saw'), lp=1500) * swell(rest, 0.1, 0.9) * 0.3
-    return reverb(softclip(mix(rise, charge, place(mix(impact, roar), cd, dur)), 1.8), 0.4, 0.28, name, hp=80)
+    rise = mix(riser(name, cd, 150, 2600) * 0.5, osc(glide(120, 520, cd), cd, 'saw') * swell(cd, 0.8, 0.2) * 0.3)
+    roar = spec_filter(osc(glide(200, 130, rest), rest, 'saw'), lp=1600) * swell(rest, 0.1, 0.9) * 0.35
+    hd = min(0.8, rest)
+    flav = to_len(mix(roar, lowmid_impact(name, rest, 180, 1200, 0.6, 0.1)), n_samp(hd))
+    hit = boom(name, hd, sub=1.1, crack=0.7, flavor=flav)
+    return reverb(softclip(mix(place(rise, 0, dur), place(hit, cd, dur)), 1.7), 0.55, 0.3, name, hp=50)
 
-def meteor(name, dur=1.15):
-    cd = dur * 0.55
-    rest = dur - cd
-    fall = tv_bandpass(noise(cd, name, 'mt'), glide(1200, 250, cd), q=1.5) * swell(cd, 0.6, 0.4) * 0.6
-    fall = mix(fall, osc(glide(400, 100, cd), cd, 'saw') * swell(cd, 0.7, 0.3) * 0.3)
-    impact = mix(body_thump(name, rest, 140, 40, 1.0, 0.4), lowmid_impact(name, rest, 150, 900, 0.7, 0.1),
-                 spec_filter(noise(rest, name, 'mi'), hp=1000, lp=10000) * perc(rest, 0.001, 0.05) * 0.6)
-    return reverb(softclip(mix(fall, place(impact, cd, dur)), 1.8), 0.45, 0.3, name, hp=60)
+def meteor(name, dur=1.6, windup=0.8):
+    # 天降流星：降落前(由遠而近的火焰尖嘯+低沉預兆) → 砸地(巨響+火焰炸開+碎石+餘震)。
+    # windup 對齊視覺 z.delay(法師/元素 ≈ 0.8s)，砸地巨響剛好落在隕石撞地那一刻。
+    rest = dur - windup
+    nw = n_samp(windup)
+    omen = osc(glide(70, 92, windup), windup, 'sine') * swell(windup, 0.2, 0.8) * 0.35
+    scream = tv_bandpass(noise(windup, name, 'mt'), glide(300, 1700, windup), q=1.4) * (np.linspace(0, 1, nw) ** 2) * 0.6
+    whistle = spec_filter(osc(glide(500, 1500, windup), windup, 'saw'), lp=3000) * (np.linspace(0, 1, nw) ** 3) * 0.2
+    pre = mix(omen, scream, whistle)
+    hd = min(0.95, rest)
+    fire = mix(tv_bandpass(noise(hd, name, 'mf'), glide(900, 200, hd), q=1.1) * swell(hd, 0.05, 0.95) * 0.6,
+               spec_filter(noise(hd, name, 'mk'), hp=1200, lp=9000) * (rng(name, 'mx').random(n_samp(hd)) > 0.96) * 0.5)
+    hit = boom(name, hd, sub=1.2, crack=0.8, flavor=fire)
+    debris = np.zeros(n_samp(rest))
+    r = rng(name, 'md')
+    for i in range(6):
+        debris = mix(debris, place(lowmid_impact(name + str(i), 0.15, 150, 800, 0.3, 0.05), r.random() * rest * 0.7, rest))
+    rumble = spec_filter(noise(rest, name, 'mr'), hp=25, lp=130) * swell(rest, 0.05, 0.95) * 0.5
+    post = mix(place(hit, 0, rest), debris, rumble)
+    return reverb(softclip(mix(place(pre, 0, dur), place(post, windup, dur)), 1.6), 0.6, 0.34, name, hp=30)
 
-def meteor_storm(name, dur=1.2):
+def meteor_storm(name, dur=1.8):
+    # 隕石風暴：多顆隕石錯落砸下（各自短下墜 + 砸地）+ 持續地鳴。
     out = np.zeros(n_samp(dur))
     r = rng(name, 'ms')
-    for i in range(4):
-        out = mix(out, place(meteor(name + str(i), 0.6) * 0.7, r.random() * dur * 0.6, dur))
-    return reverb(out, 0.4, 0.3, name, hp=50)
+    for i, t0 in enumerate((0.0, 0.45, 0.85, 1.25)):
+        out = mix(out, place(meteor(name + str(i), 0.65, windup=0.35) * 0.7, t0 + r.random() * 0.06, dur))
+    rumble = spec_filter(noise(dur, name, 'msr'), hp=25, lp=150) * swell(dur, 0.2, 0.8) * 0.4
+    return reverb(mix(out, rumble), 0.5, 0.32, name, hp=30)
 
-def earth_quake(name, dur=1.2):
-    rumble = spec_filter(noise(dur, name, 'eq'), hp=25, lp=140) * swell(dur, 0.2, 0.8) * 0.9
-    sub = osc(glide(45, 28, dur), dur, 'sine') * swell(dur, 0.15, 0.85) * 0.7
+def earth_quake(name, dur=1.5):
+    # 大地崩裂：地面隆起(riser) → 主裂巨響 + 持續低頻地鳴 + 連串裂縫崩塌。
+    heave = riser(name, 0.35, 40, 400) * 0.4
+    rumble = spec_filter(noise(dur, name, 'eq'), hp=22, lp=130) * swell(dur, 0.25, 0.75) * 1.0
+    sub = (osc(glide(48, 26, dur), dur, 'sine') + 0.5 * osc(glide(70, 34, dur), dur, 'tri')) * swell(dur, 0.2, 0.8) * 0.7
     cracks = np.zeros(n_samp(dur))
     r = rng(name, 'cr')
-    for i in range(5):
-        cracks = mix(cracks, place(lowmid_impact(name + str(i), 0.2, 200, 1200, 0.5, 0.05), 0.1 + r.random() * 0.9, dur))
-    boom = place(body_thump(name, 0.4, 100, 40, 1.0, 0.4), dur * 0.1, dur)
-    return reverb(softclip(mix(rumble, sub, cracks, boom), 2.0), 0.5, 0.3, name, hp=25)
+    for i in range(7):
+        cracks = mix(cracks, place(boom(name + str(i), 0.3, sub=0.5, crack=0.5), 0.3 + r.random() * 0.9, dur))
+    main = place(boom(name, 0.5, sub=1.3, crack=0.6), 0.3, dur)
+    return reverb(softclip(mix(place(heave, 0, dur), rumble, sub, cracks, main), 1.9), 0.6, 0.32, name, hp=20)
 
-def plague_nova(name, dur=1.05):
+def plague_nova(name, dur=1.25):
+    # 瘟疫爆發：毒氣嘶嘶蓄積 → 濕黏炸裂 + 瘟疫向外擴散。
     cd = dur * 0.4
     rest = dur - cd
-    charge = gas_hiss(name + 'c', cd) * 0.6
-    burst = mix(body_thump(name, rest, 100, 42, 0.9, 0.4),
-                spec_filter(noise(rest, name, 'pn'), hp=300, lp=3500) * perc(rest, 0.001, rest * 0.25) * 0.6)
-    spread = tv_bandpass(noise(rest, name, 'ps'), glide(1500, 400, rest), q=1.5) * swell(rest, 0.1, 0.9) * 0.4
-    return reverb(softclip(mix(charge, place(mix(burst, spread), cd, dur)), 1.6), 0.4, 0.3, name, hp=80)
+    charge = mix(gas_hiss(name + 'c', cd) * 0.6, riser(name, cd, 200, 1800) * 0.3)
+    hd = min(0.8, rest)
+    spread = tv_bandpass(noise(hd, name, 'ps'), glide(1600, 300, hd), q=1.4) * swell(hd, 0.1, 0.9) * 0.5
+    wet = spec_filter(noise(hd, name, 'pw'), hp=200, lp=2500) * perc(hd, 0.001, hd * 0.4) * 0.5
+    hit = boom(name, hd, sub=0.9, crack=0.5, flavor=mix(spread, wet))
+    return reverb(softclip(mix(place(charge, 0, dur), place(hit, cd, dur)), 1.6), 0.55, 0.32, name, hp=60)
 
-def arrow_barrage(name, dur=1.0):
-    out = np.zeros(n_samp(dur))
+def arrow_barrage(name, dur=1.4):
+    # 天羽箭暴：拉弓蓄勢 → 漫天箭雨呼嘯而下 + 落地連串撞擊。
     r = rng(name, 'ab')
-    for i in range(10):
-        out = mix(out, place(bowshot(name + str(i), 0.25, 420 + r.random() * 120, rapid=True) * 0.7, r.random() * dur * 0.7, dur))
-    rain = spec_filter(noise(dur, name, 'rn'), hp=2000, lp=8000) * swell(dur, 0.3, 0.7) * 0.2
-    return reverb(mix(out, rain), 0.3, 0.24, name)
+    draw = mix(karplus(180, 0.4, 0.4, name + 'd') * perc(0.4, 0.002, 0.25) * 0.5, riser(name, 0.4, 300, 2000) * 0.3)
+    out = place(draw, 0, dur)
+    for i in range(14):
+        out = mix(out, place(bowshot(name + str(i), 0.22, 420 + r.random() * 140, rapid=True) * 0.6, 0.35 + r.random() * 0.8, dur))
+    impacts = np.zeros(n_samp(dur))
+    for i in range(8):
+        impacts = mix(impacts, place(lowmid_impact(name + 'i' + str(i), 0.12, 200, 1400, 0.3, 0.04), 0.5 + r.random() * 0.8, dur))
+    rain = spec_filter(noise(dur, name, 'rn'), hp=2500, lp=9000) * swell(dur, 0.4, 0.6) * 0.2
+    return reverb(mix(out, impacts, rain), 0.35, 0.26, name)
 
-def falcon_storm(name, dur=1.0):
+def falcon_storm(name, dur=1.4):
+    # 鷹擊風暴：群鷹尖嘯盤旋 + 接連俯衝撞擊 + 狂風。
     out = np.zeros(n_samp(dur))
     r = rng(name, 'fst')
+    for i in range(6):
+        out = mix(out, place(screech(name + str(i), 0.4, rise=(i % 2 == 0)) * 0.6, r.random() * dur * 0.75, dur))
     for i in range(5):
-        out = mix(out, place(screech(name + str(i), 0.4, rise=(i % 2 == 0)) * 0.6, r.random() * dur * 0.7, dur))
-    wind = tv_bandpass(noise(dur, name, 'wd'), glide(400, 1400, dur), q=1.2) * swell(dur, 0.3, 0.7) * 0.4
-    return reverb(mix(out, wind), 0.35, 0.28, name)
+        dive = mix(whoosh(name + 'w' + str(i), 0.2, 300, 2400, down=False, q=2.5) * 0.5,
+                   lowmid_impact(name + 'h' + str(i), 0.12, 250, 1600, 0.4, 0.04))
+        out = mix(out, place(dive, 0.3 + r.random() * 0.8, dur))
+    wind = tv_bandpass(noise(dur, name, 'wd'), glide(400, 1600, dur), q=1.2) * swell(dur, 0.3, 0.7) * 0.4
+    return reverb(mix(out, wind), 0.4, 0.3, name)
 
-def rewind(name, dur=1.2):
-    sweep = tv_bandpass(noise(dur, name, 'rw'), glide(2500, 200, dur), q=1.6) * swell(dur, 0.5, 0.5) * 0.5
-    sweep = sweep[::-1]
+def bullet_storm(name, dur=1.3):
+    # 彈幕風暴：密集連發漸強 + 彈殼叮噹 + 收尾大口徑一響。
+    out = place(multigun(name, dur * 0.85, shots=18, caliber=0.8), 0, dur)
+    shells = np.zeros(n_samp(dur))
+    r = rng(name, 'sh')
+    for i in range(10):
+        shells = mix(shells, place(metal_ring(name + str(i), 0.06, 1400 + r.random() * 800, (1, 2.1), 0.12, 0.03), r.random() * dur * 0.85, dur))
+    finale = place(gunshot(name + 'fin', 0.4, caliber=1.4), dur * 0.8, dur)
+    return reverb(mix(out, shells * 0.4, finale), 0.3, 0.24, name)
+
+def rewind(name, dur=1.4):
+    # 時空逆轉：反轉掃頻吸入 → 時間扣下的「鏘」 + 倒灌鐘聲級聯 + 扭曲顫音。
+    sweep = (tv_bandpass(noise(dur, name, 'rw'), glide(2500, 200, dur), q=1.6) * swell(dur, 0.5, 0.5) * 0.5)[::-1]
     chimes = np.zeros(n_samp(dur))
-    for i, p in enumerate((1, 1.5, 2, 2.5)):
-        chimes = mix(chimes, place(metal_ring(name + str(i), 0.4, 600 * p, (1, 2, 3), 0.2, 0.3), 0.15 + i * 0.18, dur))
-    boom = place(body_thump(name, 0.4, 120, 45, 0.9, 0.4), dur * 0.6, dur)
-    return reverb(softclip(mix(sweep, chimes, boom), 1.5), 0.5, 0.32, name)
+    for i, p in enumerate((1, 1.5, 2, 2.5, 3)):
+        chimes = mix(chimes, place(metal_ring(name + str(i), 0.4, 600 * p, (1, 2, 3), 0.2, 0.3), 0.1 + i * 0.16, dur))
+    snap = place(boom(name, 0.5, sub=0.9, crack=0.6), dur * 0.62, dur)
+    warble = osc(np.asarray(glide(300, 200, dur)) * (1 + 0.04 * osc(6, dur, 'sine')), dur, 'sine') * swell(dur, 0.3, 0.7) * 0.2
+    return reverb(softclip(mix(sweep, chimes, snap, warble), 1.5), 0.55, 0.34, name)
 
-def whisper_swarm(name, dur=1.15):
+def whisper_swarm(name, dur=1.4):
+    # 萬咒齊發：大量詛咒低語匯聚 → 暗能炸開。
     swarm = np.zeros(n_samp(dur))
     r = rng(name, 'ws')
-    for i in range(12):
-        f = glide(200 + r.random() * 200, 150 + r.random() * 150, dur)
-        v = spec_filter(osc(f, dur, 'saw'), lp=1500) * swell(dur, 0.3 + r.random() * 0.3, 0.5) * 0.12
-        swarm = mix(swarm, v)
-    burst = place(mix(body_thump(name, 0.5, 90, 40, 0.9, 0.4),
-                      spec_filter(noise(0.5, name, 'wb'), hp=300, lp=2500) * perc(0.5, 0.001, 0.2) * 0.5), dur * 0.55, dur)
-    return reverb(softclip(mix(swarm, burst), 1.5), 0.45, 0.34, name, hp=80)
+    for i in range(16):
+        f = glide(180 + r.random() * 220, 140 + r.random() * 160, dur)
+        swarm = mix(swarm, spec_filter(osc(f, dur, 'saw'), lp=1600) * swell(dur, 0.3 + r.random() * 0.35, 0.5) * 0.1)
+    burst = place(boom(name, 0.7, sub=0.9, crack=0.5,
+                       flavor=spec_filter(noise(0.7, name, 'wb'), hp=300, lp=2800) * perc(0.7, 0.001, 0.25) * 0.5),
+                  dur * 0.55, dur)
+    return reverb(softclip(mix(swarm, burst), 1.5), 0.5, 0.36, name, hp=60)
 
-def undead_army(name, dur=1.25):
-    portal = summon(name, dur * 0.7, dark=True) * 0.8
+def undead_army(name, dur=1.5):
+    # 亡靈大軍：暗黑傳送門開啟(riser) → 巨響 + 亡者哀嚎 + 白骨喀喀 + 地底轟鳴。
+    portal = mix(summon(name, dur * 0.7, dark=True) * 0.8, riser(name, 0.4, 60, 800) * 0.3)
     moans = np.zeros(n_samp(dur))
     r = rng(name, 'um')
-    for i in range(6):
-        f = glide(120 + r.random() * 80, 90 + r.random() * 60, dur)
-        moans = mix(moans, spec_filter(osc(f, dur, 'saw'), lp=900) * swell(dur, 0.3 + r.random() * 0.3, 0.5) * 0.18)
-    rumble = spec_filter(noise(dur, name, 'ur'), hp=30, lp=160) * swell(dur, 0.2, 0.8) * 0.5
-    return reverb(softclip(mix(portal, moans, rumble), 1.5), 0.5, 0.34, name, hp=40)
+    for i in range(8):
+        f = glide(110 + r.random() * 90, 80 + r.random() * 60, dur)
+        moans = mix(moans, spec_filter(osc(f, dur, 'saw'), lp=950) * swell(dur, 0.3 + r.random() * 0.35, 0.5) * 0.15)
+    bones = np.zeros(n_samp(dur))
+    for i in range(10):
+        bones = mix(bones, place(metal_ring(name + 'b' + str(i), 0.05, 900 + r.random() * 500, (1, 1.7), 0.1, 0.025), 0.2 + r.random() * 1.1, dur))
+    quake = place(boom(name, 0.6, sub=1.1, crack=0.4), dur * 0.45, dur)
+    rumble = spec_filter(noise(dur, name, 'ur'), hp=28, lp=150) * swell(dur, 0.2, 0.8) * 0.5
+    return reverb(softclip(mix(portal, moans, bones * 0.4, quake, rumble), 1.5), 0.6, 0.36, name, hp=30)
 
-def grand_summon(name, dur=1.3):
-    base = summon(name, dur * 0.8, dark=False)
+def grand_summon(name, dur=1.5):
+    # 大召喚術：傳送門充能(riser) → 巨響 + 空靈合唱 + 上升光柱。
+    base = mix(summon(name, dur * 0.75, dark=False), riser(name, 0.45, 100, 2000) * 0.3)
     chorus = np.zeros(n_samp(dur))
-    for f in (220, 330, 440):
-        chorus = mix(chorus, osc(glide(f, f * 1.1, dur), dur, 'sine') * adsr(dur, 0.2, 0.2, 0.7, 0.4) * 0.2)
-    boom = place(body_thump(name, 0.5, 90, 40, 0.9, 0.4), dur * 0.5, dur)
-    return reverb(softclip(mix(base, spec_filter(chorus, lp=3000), boom), 1.5), 0.5, 0.34, name, hp=150)
+    for f in (220, 330, 440, 550):
+        chorus = mix(chorus, osc(glide(f, f * 1.08, dur), dur, 'sine') * adsr(dur, 0.2, 0.2, 0.7, 0.45) * 0.18)
+    slam = place(boom(name, 0.6, sub=1.0, crack=0.5), dur * 0.45, dur)
+    return reverb(softclip(mix(base, spec_filter(chorus, lp=3200), slam), 1.5), 0.6, 0.36, name, hp=120)
 
-def life_confluence(name, dur=1.3):
-    # 溫暖飽滿的聖光匯流（壓低刺耳頂端）。
-    bell = holy(name, dur, bright=0.92, pitch=0.92, choir=1.0,
-                shimmer=0.05, shimmer_hp=2400, top=0.07, warm=0.6, lp=6000)
-    swellup = tv_bandpass(noise(dur, name, 'lc'), glide(350, 2400, dur), q=1.5) * swell(dur, 0.6, 0.4) * 0.18
-    return reverb(mix(bell, swellup), 0.5, 0.34, name, hp=200)
+def life_confluence(name, dur=1.5):
+    # 生命匯流：溫暖聖光漸強匯聚 → 飽滿的治癒爆發（保持柔和、不刺耳）+ 暖低頻撐底。
+    swellp = tv_bandpass(noise(dur, name, 'lc'), glide(300, 2000, dur), q=1.5) * swell(dur, 0.6, 0.4) * 0.18
+    bell = holy(name, dur, bright=0.92, pitch=0.92, choir=1.0, shimmer=0.05, shimmer_hp=2400, top=0.07, warm=0.7, lp=6000)
+    burst = place(holy(name + 'b', 0.8, bright=0.95, pitch=1.0, choir=1.0, shimmer=0.05, shimmer_hp=2500, top=0.07, warm=0.5, lp=6500) * 0.7, dur * 0.4, dur)
+    sub = osc(glide(70, 55, dur), dur, 'sine') * swell(dur, 0.3, 0.7) * 0.3
+    return reverb(mix(bell, burst, swellp, sub), 0.6, 0.36, name, hp=120)
 
-def symphony(name, dur=1.2):
-    ch = chord_swell(name, dur, root=196, bright=1.2)
-    harp = place(harp_chord(name + 'h', 0.6, (392, 494, 587, 784)) * 0.6, dur * 0.4, dur)
-    bell = holy(name + 'b', dur, 1.0, 1.3) * 0.3
-    return reverb(mix(ch, harp, bell), 0.5, 0.34, name)
+def symphony(name, dur=1.5):
+    # 狂想交響樂：管弦漸強 → 和弦高潮 + 漸強鈸 + 豎琴級聯 + 定音鼓。
+    ch = chord_swell(name, dur, root=196, bright=1.1)
+    harp = place(harp_chord(name + 'h', 0.6, (392, 494, 587, 784)) * 0.6, dur * 0.45, dur)
+    bell = holy(name + 'b', dur, bright=0.95, pitch=1.1, shimmer=0.06, shimmer_hp=3000, top=0.1, lp=8000) * 0.3
+    cym = spec_filter(noise(dur, name, 'cy'), hp=3000, lp=12000) * swell(dur, 0.55, 0.45) * 0.18
+    timp = place(boom(name, 0.5, sub=0.7, crack=0.3), dur * 0.42, dur)
+    return reverb(mix(ch, harp, bell, cym, timp), 0.55, 0.36, name)
 
-def shadow_flurry(name, dur=1.0):
+def shadow_flurry(name, dur=1.2):
+    # 千影分身：殘影連斬層層加速 → 最後致命一擊 + 衝擊。
     out = np.zeros(n_samp(dur))
     r = rng(name, 'sf')
-    for i in range(7):
-        cut = swing_blade(name + str(i), 0.22, weight=0.7, bright=1.0, edge=0.26, ring_base=480)
-        out = mix(out, place(cut * (0.95 ** i), i * (dur * 0.7 / 7) + r.random() * 0.02, dur))
-    out = mix(out, place(swing_blade(name + 'fin', 0.3, 1.0, 1.0, 0.34, 440), dur * 0.7, dur))
-    return spec_filter(out, lp=8500)
+    for i in range(10):
+        cut = swing_blade(name + str(i), 0.2, weight=0.7, bright=1.0, edge=0.26, ring_base=480)
+        out = mix(out, place(cut * (0.96 ** i), i * (dur * 0.62 / 10) + r.random() * 0.02, dur))
+    fin = place(mix(swing_blade(name + 'fin', 0.32, 1.1, 1.0, 0.34, 440), boom(name, 0.45, sub=0.8, crack=0.5)), dur * 0.66, dur)
+    return spec_filter(reverb(mix(out, fin), 0.4, 0.3, name), lp=8500)
 
-def cosmic_burst(name, dur=1.25):
-    cd = dur * 0.4
+def cosmic_burst(name, dur=1.5):
+    # 星環終焉砲：星能充能(riser) → 巨型雷射 + 深 sub 衝擊 + 宇宙微光尾。
+    cd = dur * 0.42
     rest = dur - cd
-    charge = osc(glide(200, 1200, cd), cd, 'saw') * swell(cd, 0.7, 0.3) * 0.3
-    charge = mix(charge, tv_bandpass(noise(cd, name, 'cb'), glide(400, 3000, cd), q=1.6) * swell(cd, 0.7, 0.3) * 0.3)
-    beam = laser(name, rest, pitch=0.7, heavy=True)
-    sub = osc(glide(140, 45, rest), rest, 'sine') * perc(rest, 0.002, rest * 0.4) * 0.7
-    return reverb(softclip(mix(charge, place(mix(beam, sub), cd, dur)), 1.7), 0.45, 0.32, name, hp=80)
+    charge = mix(osc(glide(180, 1300, cd), cd, 'saw') * swell(cd, 0.75, 0.25) * 0.3,
+                 tv_bandpass(noise(cd, name, 'cb'), glide(400, 3200, cd), q=1.6) * swell(cd, 0.8, 0.2) * 0.3,
+                 riser(name, cd, 200, 3000) * 0.3)
+    hd = min(0.9, rest)
+    beam = to_len(laser(name, hd, pitch=0.6, heavy=True), n_samp(hd))
+    shimmer = spec_filter(noise(hd, name, 'cs'), hp=4000, lp=12000) * swell(hd, 0.2, 0.8) * 0.2
+    hit = boom(name, hd, sub=1.2, crack=0.7, flavor=mix(beam, shimmer))
+    return reverb(softclip(mix(place(charge, 0, dur), place(hit, cd, dur)), 1.7), 0.6, 0.34, name, hp=40)
 
-def mountain_root(name, dur=1.2):
-    # 不動如山：紮根大地的深沉 THOOM + 碎石滾動 + 持續低頻地鳴（如山般沉穩不動）。
-    thoom = body_thump(name, dur * 0.5, 88, 36, 1.0, 0.5)
-    grind = spec_filter(noise(dur, name, 'gr'), hp=55, lp=380) * swell(dur, 0.1, 0.9) * 0.5
-    drone = (osc(glide(54, 51, dur), dur, 'sine') + 0.5 * osc(glide(82, 80, dur), dur, 'tri')) * adsr(dur, 0.1, 0.3, 0.7, 0.4) * 0.5
+def mountain_root(name, dur=1.5):
+    # 不動如山：紮根巨踏(boom) + 上升地脈光柱 + 持續低頻地鳴 + 碎石（沉穩如山）。
+    stomp_ = boom(name, 0.5, sub=1.2, crack=0.4)
+    pillar = mix(whoosh(name + 'p', 0.6, 80, 900, down=False, q=2.0) * 0.4, osc(glide(60, 140, 0.6), 0.6, 'saw') * swell(0.6, 0.7, 0.3) * 0.3)
+    drone = (osc(glide(54, 51, dur), dur, 'sine') + 0.5 * osc(glide(82, 80, dur), dur, 'tri')) * adsr(dur, 0.1, 0.3, 0.7, 0.45) * 0.5
+    grind = spec_filter(noise(dur, name, 'gr'), hp=50, lp=400) * swell(dur, 0.1, 0.9) * 0.45
     stones = np.zeros(n_samp(dur))
     r = rng(name, 'mr')
-    for i in range(4):
-        stones = mix(stones, place(lowmid_impact(name + str(i), 0.2, 120, 600, 0.4, 0.06), 0.05 + r.random() * 0.5, dur))
-    return reverb(softclip(mix(thoom, grind, spec_filter(drone, lp=2000), stones), 1.8), 0.4, 0.3, name, hp=30)
+    for i in range(5):
+        stones = mix(stones, place(lowmid_impact(name + str(i), 0.2, 120, 600, 0.35, 0.06), 0.05 + r.random() * 0.7, dur))
+    return reverb(softclip(mix(place(stomp_, 0, dur), place(pillar, 0.05, dur), spec_filter(drone, lp=2000), grind, stones), 1.8), 0.55, 0.34, name, hp=25)
 
 def clock_haste(name, dur=0.55):
     # 時間加速：上揚能量 swell + 越來越快的時鐘滴答（間隔遞減）。
@@ -786,9 +881,9 @@ def star_gather(name, dur=0.55):
 
 # 通用 hit / hurt / death / footstep
 def impact_hit(name, dur=0.18):
-    thud = body_thump(name, dur, 190, 70, 1.0, 0.4)
-    slap = spec_filter(noise(dur * 0.5, name, 'ih'), hp=800, lp=6000) * perc(dur * 0.5, 0.0008, 0.025) * 0.8
-    crunch = spec_filter(noise(dur, name, 'ic'), hp=200, lp=2200) * perc(dur, 0.001, dur * 0.2) * 0.4
+    thud = body_thump(name, dur, 200, 80, 1.0, 0.4)
+    slap = spec_filter(noise(dur * 0.5, name, 'ih'), hp=800, lp=6000) * perc(dur * 0.5, 0.0008, 0.03) * 1.0
+    crunch = spec_filter(noise(dur, name, 'ic'), hp=250, lp=2400) * perc(dur, 0.001, dur * 0.25) * 0.6  # 中頻捶擊
     return reverb(softclip(mix(thud, slap, crunch), 2.0), 0.12, 0.1, name)
 
 def hurt_body(name, dur=0.2):
@@ -811,15 +906,15 @@ def footstep(name, dur=0.13, heavy=0.5):
 
 R = {}
 
-def reg(name, fn, peak=0.9, fo=12.0):
-    R[name] = (fn, peak, fo)
+def reg(name, fn, loud=1.0, fo=12.0):
+    R[name] = (fn, loud, fo)
 
 def reg_char(cid, basic, skill1, skill2, ult):
     # 普攻最常觸發，統一過一道高頻 shelf 去刺耳（暗的普攻無高頻、幾乎不受影響）。
     reg(f'{cid}_basic', lambda: hishelf(np.asarray(basic(), dtype=float), 2800, 0.38))
     reg(f'{cid}_skill1', skill1)
     reg(f'{cid}_skill2', skill2)
-    reg(f'{cid}_ultimate', ult)
+    reg(f'{cid}_ultimate', ult, loud=1.12)  # 大招稍微更響更有存在感
 
 # ── 泛型（魔王/召喚物 等回退用；整體升級）──
 reg('footstep1', lambda: footstep('footstep1', 0.12, 0.4))
@@ -852,21 +947,21 @@ reg_char('samurai',
     lambda: mix(teleport('samurai_skill1t', 0.16) * 0.5, place(swing_blade('samurai_skill1c', 0.28, 0.9, 1.4, 0.45, 640), 0.08, 0.32)),
     lambda: mix(spec_filter(noise(0.34, 'sam_sheath', 's'), hp=2500, lp=8000) * perc(0.34, 0.002, 0.06) * 0.5,
                 osc(glide(140, 120, 0.34), 0.34, 'sine') * swell(0.34, 0.3, 0.7) * 0.3),
-    lambda: ult_release('samurai_ultimate', 1.1, swing_blade('sam_ult_cut', 0.5, 1.3, 1.3, 0.6, 560) * 0.8, charge_pitch=1.2))
+    lambda: ult_release('samurai_ultimate', 1.3, swing_blade('sam_ult_cut', 0.6, 1.3, 1.3, 0.6, 560) * 0.9, charge_pitch=1.2, charge_frac=0.5, crack=0.8))
 
 # magic-swordsman：鋼鐵 + 魔法 — 魔刃連斬 / 劍氣波 / 魔能護體 / 極限解放
 reg_char('magic-swordsman',
     lambda: mix(swing_blade('mss_basic', 0.34, 1.0, 1.2, 0.35, 500), cast('mss_glow', 0.34, 'arcane', 1.6) * 0.3),
     lambda: magic_bolt('mss_wave', 0.34, 'arcane', 1.2),
     lambda: buff_swell('mss_guard', 0.5, 'arcane', 1.1),
-    lambda: ult_release('mss_ult', 1.15, swing_blade('mss_ult_c', 0.5, 1.2, 1.3, 0.5, 520) * 0.8, charge_pitch=1.3))
+    lambda: ult_release('mss_ult', 1.4, swing_blade('mss_ult_c', 0.6, 1.2, 1.3, 0.5, 520) * 0.9, charge_pitch=1.3, sub=1.1))
 
 # berserker：雙斧血腥 — 雙斧 / 嗜血躍斬 / 血怒 / 血祭處決
 reg_char('berserker',
     lambda: swing_axe('berserker_basic', 0.36, weight=1.5, double=True),
     lambda: mix(whoosh('bsk_leap', 0.3, 150, 1400, down=False, q=2.0) * 0.6, place(swing_axe('bsk_leap_c', 0.34, 1.5), 0.18, 0.4)),
     lambda: rage_growl('berserker_skill2'),
-    lambda: ult_release('berserker_ultimate', 1.1, swing_axe('bsk_ult_c', 0.5, 1.6) * 0.85, charge_pitch=0.85))
+    lambda: ult_release('berserker_ultimate', 1.3, swing_axe('bsk_ult_c', 0.6, 1.6) * 0.95, charge_pitch=0.85, sub=1.15, crack=0.8))
 
 # fighter：聚氣爆發武僧 — 連環拳 / 聚氣 / 不動明王 / 真·昇龍霸
 reg_char('fighter',
@@ -888,9 +983,9 @@ reg_char('paladin',
                 holy('pal_glow', 0.36, bright=0.9, pitch=1.0, shimmer=0.05, shimmer_hp=2600, top=0.07, warm=0.4, lp=6500) * 0.22),
     lambda: holy_charge('paladin_skill1'),
     lambda: holy('paladin_skill2', 0.6, bright=0.88, pitch=0.85, choir=0.7, shimmer=0.05, shimmer_hp=2400, top=0.06, warm=0.55, lp=5800),
-    lambda: ult_release('paladin_ultimate', 1.2,
-                        holy('pal_ult', 0.65, bright=0.95, pitch=0.9, choir=1.0, shimmer=0.05, shimmer_hp=2500, top=0.07, warm=0.6, lp=6200) * 0.8,
-                        charge_pitch=1.0, hp=200))
+    lambda: ult_release('paladin_ultimate', 1.5,
+                        holy('pal_ult', 0.9, bright=0.95, pitch=0.9, choir=1.0, shimmer=0.05, shimmer_hp=2500, top=0.07, warm=0.7, lp=6200) * 0.9,
+                        charge_pitch=1.0, charge_frac=0.32, hp=200, sub=1.1, crack=0.35))
 
 # assassin：毒匕首 — 毒牙連刺 / 毒霧步 / 淬毒之刃 / 瘟疫爆發
 reg_char('assassin',
@@ -919,14 +1014,14 @@ reg_char('gunner',
     lambda: spec_filter(multigun('gunner_basic', 0.34, shots=2, caliber=0.8), lp=6800),
     lambda: roll('gunner_skill1', 0.3),
     lambda: incendiary('gunner_skill2'),
-    lambda: multigun('gunner_ultimate', 1.0, shots=14, caliber=0.8))
+    lambda: bullet_storm('gunner_ultimate', 1.3))
 
 # mage：法系（cast 允許相似）— 奧術飛彈 / 烈焰吐息 / 寒冰矛 / 天降流星
 reg_char('mage',
     lambda: magic_bolt('mage_basic', 0.36, 'arcane', 1.1),
     lambda: fire_breath('mage_skill1', 0.5),
     lambda: ice_spear('mage_skill2', 0.4),
-    lambda: meteor('mage_ultimate', 1.15))
+    lambda: meteor('mage_ultimate', 1.7, windup=0.8))
 
 # elementalist：多元素 — 火焰扇 / 雷霆風暴 / 寒霜足跡 / 隕石風暴
 reg_char('elementalist',
@@ -1025,8 +1120,8 @@ def main():
         print('可用：', ', '.join(sorted(R.keys())))
         return 1
     for name in targets:
-        fn, peak, fo = R[name]
-        wav = finalize(np.asarray(fn(), dtype=float), peak=peak, fade_out=fo)
+        fn, loud, fo = R[name]
+        wav = finalize(np.asarray(fn(), dtype=float), fade_out=fo, loud=loud)
         write_wav(os.path.join(OUT_DIR, name + '.wav'), wav)
         print(f'  {name:28s} {len(wav)/SR:5.2f}s')
     if full:
