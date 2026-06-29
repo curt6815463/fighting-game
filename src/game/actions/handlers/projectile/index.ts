@@ -25,6 +25,7 @@ export function projectile(ctx: ActionContext) {
       effect: action.effect,
       split: action.split,
       homing: action.homing,
+      detonate: (action as any).detonate,
       leaveZone: action.leaveZone,
       freezeBonus: action.freezeBonus || 0,
       vfx: projVfx,

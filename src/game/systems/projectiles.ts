@@ -5,6 +5,7 @@ import { dealDamage } from '../entities/damage.ts';
 import { addFx } from '../entities/fx.ts';
 import { isEnemy, isAlly } from '../entities/team.ts';
 import { applyHeal } from '../entities/heal.ts';
+import { applyEffect } from '../entities/effects.ts';
 import { applyEffectFrom, bodyR } from '../actions/combat.ts';
 import { checkProjectileHit, damageDestructible } from './destructibles.ts';
 import type { GameState, Projectile, Player } from '../types';
@@ -119,6 +120,19 @@ export function updateProjectiles(state: GameState, dt: number) {
           }
         }
         if (projectile.effect) applyEffectFrom(state, o, projectile.effect, projectile.owner, projectile.srcSlot);
+        // 時厄術士 K/L：命中引爆目標時咒層數 —— 依層數爆傷 ＋ 附加控制（暈眩/緩速），可選擇是否消耗層數。
+        if (projectile.detonate) {
+          const det = projectile.detonate;
+          const hex = o.effects && o.effects.timehex;
+          const stacks = hex ? (hex.stacks || 0) : 0;
+          if (stacks > 0 && det.perStack) {
+            dealDamage(state, o, stacks * det.perStack, projectile.owner, { source: projectile.srcSlot });
+          }
+          if (det.stun) applyEffect(o, 'stun', { duration: det.stun });
+          if (det.slow) applyEffect(o, 'slow', { duration: det.slow.duration, factor: det.slow.factor });
+          if (det.consume && hex) delete o.effects.timehex;
+          if (stacks > 0) addFx(state, { type: 'hit', x: o.x, y: o.y, color: projectile.color, life: 0.35, radius: 40 + stacks * 6, vfx: projectile.vfx });
+        }
         addFx(state, { type: 'hit', x: projectile.x, y: projectile.y, color: projectile.color, life: 0.2, radius: projectile.radius * 2, vfx: projectile.vfx });
         projectile.hit[o.id] = true;
         if (!projectile.pierce) {

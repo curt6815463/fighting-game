@@ -116,8 +116,8 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
   //   ・承受傷害 +vulnPer（易傷，結算於 damage.ts）
   //   ・每 tick 蝕傷 stacks×dmgPerStack（低，結算於 systems/effects.ts；DPS 不高）
   //   ・**技能冷卻流速 −cdSlowPer/層**（惱人：被咒時技能/閃避回得更慢，結算於 playerState.tickCooldowns）
-  // 爆發來自「引爆」：快轉引爆（chronoaccel）或大招奇點清算（chronocollapse）。
-  // 疊加 = 加層 + 刷新持續、取較高參數。
+  // 爆發來自「引爆層數」：K/L 投射物命中時依層數爆傷（systems/projectiles 的 projectile.detonate）。
+  // 疊加 = 加層(最多 max 層) + 刷新持續、取較高參數。
   timehex: {
     cleanseable: true,
     hud: { icon: '⌛', name: '時咒', buff: false },

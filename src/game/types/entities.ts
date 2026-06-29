@@ -135,6 +135,7 @@ export interface Projectile {
   split?: any | null;        // 命中/到期分裂成 N 顆子彈
   homing: number;            // 追蹤轉向速率 (rad/s)，0 = 直線
   pull?: { gap?: number } | null; // 鉤索：命中把目標拉到 owner 面前
+  detonate?: any | null;     // 時厄術士：命中時引爆目標時咒層數（依層數爆傷＋附加控制），見 systems/projectiles
   leaveZone?: any | null;    // 落點留下 zone（煙幕等）
   freezeBonus: number;
   vfx?: string | null;

@@ -125,6 +125,7 @@ export function makeProjectile(owner: EntityId, x: number, y: number, vx: number
     split: opt.split || null,
     homing: opt.homing || 0,
     pull: opt.pull || null,
+    detonate: opt.detonate || null,
     leaveZone: opt.leaveZone || null,
     freezeBonus: opt.freezeBonus || 0,
     vfx: opt.vfx || null,
