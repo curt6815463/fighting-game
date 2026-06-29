@@ -120,7 +120,7 @@ export function updateProjectiles(state: GameState, dt: number) {
           }
         }
         if (projectile.effect) applyEffectFrom(state, o, projectile.effect, projectile.owner, projectile.srcSlot);
-        // 時厄術士 K/L：命中引爆目標時咒層數 —— 依層數爆傷 ＋ 附加控制（暈眩/緩速），可選擇是否消耗層數。
+        // 時厄術士 K/L：命中引爆目標時咒層數 —— 傷害／暈眩／緩速「全部隨層數放大」，可選擇是否消耗層數。
         if (projectile.detonate) {
           const det = projectile.detonate;
           const hex = o.effects && o.effects.timehex;
@@ -128,8 +128,16 @@ export function updateProjectiles(state: GameState, dt: number) {
           if (stacks > 0 && det.perStack) {
             dealDamage(state, o, stacks * det.perStack, projectile.owner, { source: projectile.srcSlot });
           }
-          if (det.stun) applyEffect(o, 'stun', { duration: det.stun });
-          if (det.slow) applyEffect(o, 'slow', { duration: det.slow.duration, factor: det.slow.factor });
+          // 暈眩：基礎 + 每層
+          const stunDur = (det.stun || 0) + (det.stunPerStack || 0) * stacks;
+          if (stunDur > 0) applyEffect(o, 'stun', { duration: stunDur });
+          // 緩速：時間隨層數變長、強度隨層數變強（factor 越低越慢）
+          if (det.slow) {
+            const slowDur = (det.slow.duration || 0) + (det.slowPerStack || 0) * stacks;
+            let factor = det.slow.factor != null ? det.slow.factor : 0.5;
+            if (det.slowFactorPerStack) factor = Math.max(det.slowFactorMin || 0.3, factor - det.slowFactorPerStack * stacks);
+            if (slowDur > 0) applyEffect(o, 'slow', { duration: slowDur, factor });
+          }
           if (det.consume && hex) delete o.effects.timehex;
           if (stacks > 0) addFx(state, { type: 'hit', x: o.x, y: o.y, color: projectile.color, life: 0.35, radius: 40 + stacks * 6, vfx: projectile.vfx });
         }
