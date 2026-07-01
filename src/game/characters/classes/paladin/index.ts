@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { BaseCharacter } from '../../BaseCharacter.ts';
 import { characterSprite } from '../../textureSprite.ts';
-import { drawPaladinTexture } from './texture.ts';
+import { drawPaladinTexture, drawPaladinMaterialTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
 import './talent.ts';
@@ -26,6 +26,7 @@ export class PaladinCharacter extends BaseCharacter {
       buildModel,
       buildWeapon,
       paintTexture: drawPaladinTexture,
+      paintMaterialTexture: drawPaladinMaterialTexture,
       loadVfx: () => undefined,
     });
   }
