@@ -145,6 +145,11 @@ export function makeProjectile(owner: EntityId, x: number, y: number, vx: number
     glassReflectRadiusMult: opt.glassReflectRadiusMult || 1,
     glassChildMaxReflects: opt.glassChildMaxReflects || 0,
     lastMirrorId: opt.lastMirrorId != null ? opt.lastMirrorId : null,
+    royalCardFan: !!opt.royalCardFan,
+    royalEmpowered: !!opt.royalEmpowered,
+    royalEmpoweredDmg: opt.royalEmpoweredDmg || 0,
+    royalEncoreDmg: opt.royalEncoreDmg || 0,
+    royalJokerHoming: !!opt.royalJokerHoming,
     srcSlot: opt.srcSlot != null ? opt.srcSlot : null,
     hit: {},
   };

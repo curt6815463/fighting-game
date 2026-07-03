@@ -11,3 +11,4 @@ for (const mod of Object.values({ ...modules, ...characterModules }) as any[]) {
     ACTION_HANDLERS.set(type, handler as ActionHandler);
   }
 }
+// Trigger HMR watcher refresh for newly created actions.

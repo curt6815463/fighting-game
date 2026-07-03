@@ -560,6 +560,7 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
     if (!pl) {
       const root = document.createElement('div');
       root.className = 'nplate';
+      const ncards = el('div', 'nroyal-cards', root); // Placed at the very top of the plate (above status/bars)
       const status = el('div', 'nstatus', root);
       const lock = el('div', 'nlock', root); lock.textContent = '🔒'; lock.style.display = 'none';
       const name = el('div', 'nname', root);
@@ -568,7 +569,7 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
       const buffs = el('div', 'nbuffs', root);
       const obj = new CSS2DObject(root);
       scene.add(obj);
-      pl = { obj, name, hp, shield, mp, root, status, buffs, lock };
+      pl = { obj, name, hp, shield, mp, root, status, buffs, lock, ncards };
       plates.set(pid, pl);
     }
     return pl;
@@ -618,7 +619,10 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
       if ((!p.alive && !downed) || invisHidden) continue;
       seen.add(p.id);
       const pl = ensurePlate(p.id);
-      const headY = HEAD_Y * (p.scale && p.scale > 1 ? p.scale : 1); // 巨大魔王名牌抬高到頭頂
+      let headY = HEAD_Y * (p.scale && p.scale > 1 ? p.scale : 1); // 巨大魔王名牌抬高到頭頂
+      if (p.charId === 'royal-magician') {
+        headY += 24; // Lift label up to prevent overlapping the magician's top hat
+      }
       pl.obj.position.set(sceneX(p.x), headY, sceneZ(p.y));
       if (downed) {
         const prog = Math.floor(Math.min(1, (p.reviveProg || 0) / 3) * 100);
@@ -634,6 +638,55 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
       setStyle(pl.shield, 'width', pct((p.shield || 0) / p.maxHp));
       setStyle(pl.mp, 'width', pct(p.mana / p.maxMana));
       setHtml(pl.buffs, buildPlateBuffs(p));
+
+      // Royal Magician Poker Suits 2D HUD Render (Above HP Bar)
+      if (p.charId === 'royal-magician' && Array.isArray(p.royalCards) && p.royalCards.length > 0) {
+        let cardsHtml = '';
+        for (let i = 0; i < p.royalCards.length; i++) {
+          const suit = p.royalCards[i];
+          let color = '#005f73';
+          let char = '♠';
+          let background = '#ffffff';
+          let border = '1.5px solid #d4af37';
+          let textShadow = 'none';
+
+          if (suit === 'R') {
+            color = '#d90429';
+            char = '♦';
+          } else if (suit === 'J') {
+            color = '#ffffff';
+            char = '🃏';
+            background = 'linear-gradient(135deg, #7b2ff7, #ffd166)';
+            border = '2px solid #ffffff';
+            textShadow = '0 0 4px #7b2ff7';
+          }
+
+          cardsHtml += `<span style="
+            display: inline-block;
+            width: 16px;
+            height: 24px;
+            line-height: 24px;
+            background: ${background};
+            border: ${border};
+            border-radius: 3.5px;
+            color: ${color};
+            font-weight: 900;
+            font-size: 16px;
+            text-align: center;
+            margin: 0 4px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
+            font-family: 'Arial Black', Impact, sans-serif;
+            text-shadow: ${textShadow};
+          ">${char}</span>`;
+        }
+        setHtml(pl.ncards, cardsHtml);
+        setStyle(pl.ncards, 'display', 'block');
+        setStyle(pl.ncards, 'margin-bottom', '6px');
+        setStyle(pl.ncards, 'text-align', 'center');
+      } else {
+        setStyle(pl.ncards, 'display', 'none');
+      }
+
       const sInfo = stunInfo(p);
       if (sInfo) {
         setStyle(pl.status, 'display', '');

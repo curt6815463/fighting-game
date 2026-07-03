@@ -1188,6 +1188,10 @@ export function animateModel(group, dt, info) {
       }
     }
 
+    if (parts.customUpdate && typeof parts.customUpdate === 'function') {
+      parts.customUpdate(dt, group, ud, info);
+    }
+
     updateBossModelVisuals(group, ud, dt, { ...info, targetOpacity: targetOp });
   } catch (err) {
     console.error("animateModel ERROR:", err);
