@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawNecromancerTexture, drawNecromancerMaterialTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'necromancer', order: 16, evadeType: 'blink', name: '死靈法師', color: '#2d3436', shape: 'triangle', sprite: characterSprite('necromancer', '#2d3436', false, drawNecromancerTexture),

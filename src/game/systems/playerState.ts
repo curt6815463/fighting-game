@@ -1,5 +1,6 @@
 import { PLAYER_RADIUS, MANA_REGEN, ULT_MAX, ULT_REGEN, COOLDOWN_MULTIPLIER, difficultyMult } from '../constants.js';
 import { addFx } from '../entities/fx.ts';
+import { getEffectsCooldownRate } from '../entities/effects.ts';
 import { getTalentHooks } from '../characters/talents/registry';
 import type { GameState, Player } from '../types';
 
@@ -28,9 +29,7 @@ export function tickCooldowns(state: GameState, p: Player, talent: any, dt: numb
   let cdRate = 1;
   const cooldownRate = getTalentHooks(talent?.id)?.cooldownRate; // 例：bloodlust 失血加速
   if (cooldownRate) cdRate = cooldownRate(state, p, talent);
-  // 時咒（時厄術士）：被咒時技能/閃避冷卻流速降低（每層 cdSlowPer，最多 −50%）—— 惱人控制。
-  const th = p.effects && p.effects.timehex;
-  if (th && th.stacks > 0) cdRate *= Math.max(0.5, 1 - th.stacks * (th.cdSlowPer || 0.07));
+  cdRate *= getEffectsCooldownRate(p, state);
   cdRate /= COOLDOWN_MULTIPLIER;
   cdRate /= difficultyMult(state.flags.difficulty ?? 0.5).playerCd;
   for (const slot of COOLDOWN_SLOTS) {

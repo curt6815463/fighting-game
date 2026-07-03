@@ -1,26 +1,17 @@
-// 忍者專屬位移技：
-//  shadowstrike（影襲·處決）—— 鎖定最近「被硬控（暈/縛/凍）」的敵人，瞬移到其背後灌爆，
-//    命中後自身隱身+無敵一段時間；找不到被控目標時退化成普通向前 blink（弱化、不給隱身）。
-//  shadowflurry（千影）—— 大招：對場上敵人連續 N 次影分身瞬斬（敵人不足則重複轟同一目標，
-//    故對單體也是高總傷）；隱身/無敵窗由 action.self 套用（executor 處理）。
-// 全程 host 權威、deterministic（候選以距離→id 排序）。位移採 multiblink 同款「target.facing+π」背後落點。
+import { ARENA, PLAYER_RADIUS } from '../../../../../constants.js';
+import { clamp, dist } from '../../../../../entities/math.ts';
+import { dealDamage } from '../../../../../entities/damage.ts';
+import { applyEffect } from '../../../../../entities/effects.ts';
+import { addFx } from '../../../../../entities/fx.ts';
+import { isEnemy } from '../../../../../entities/team.ts';
+import { meleeHit, outMult } from '../../../../../actions/combat.ts';
+import type { ActionContext } from '../../../../../types';
 
-import { ARENA, PLAYER_RADIUS } from '../../../constants.js';
-import { clamp, dist } from '../../../entities/math.ts';
-import { dealDamage } from '../../../entities/damage.ts';
-import { applyEffect } from '../../../entities/effects.ts';
-import { addFx } from '../../../entities/fx.ts';
-import { isEnemy } from '../../../entities/team.ts';
-import { meleeHit, outMult } from '../../combat.ts';
-import type { ActionContext } from '../../../types';
-
-// 視為「被控、可被處決」的硬控效果
 function isControlled(o: any): boolean {
   const e = o.effects || {};
   return !!(e.root || e.stun || e.frozen);
 }
 
-// 落到 target 背後（面向 target），回傳是否成功定位
 function blinkBehind(caster: any, target: any) {
   const ang = target.facing + Math.PI;
   caster.x = clamp(target.x + Math.cos(ang) * (PLAYER_RADIUS * 2), PLAYER_RADIUS, ARENA.width - PLAYER_RADIUS);
@@ -33,7 +24,6 @@ export function shadowstrike(ctx: ActionContext) {
   const action = ctx.action as any;
   const range = action.range || 360;
 
-  // 最近的被控敵人（距離→id 排序確保 deterministic）
   const cands = Object.values(state.players)
     .filter((o: any) => isEnemy(state, caster.id, o) && o.hp > 0 && isControlled(o))
     .sort((a: any, b: any) => {
@@ -45,7 +35,6 @@ export function shadowstrike(ctx: ActionContext) {
   const target = cands.find((o: any) => dist(caster.x, caster.y, o.x, o.y) <= range);
 
   if (target) {
-    // 處決：瞬移背後 → 灌爆（被控故吃滿影殺天賦）→ 自身隱身+無敵
     blinkBehind(caster, target);
     dealDamage(state, target, (action.dmg || 0) * outMult(caster, action), caster.id);
     if (action.knockback) {
@@ -61,7 +50,6 @@ export function shadowstrike(ctx: ActionContext) {
       addFx(state, { type: 'blink', x: caster.x, y: caster.y, facing: caster.facing, range: range, color: action.color, life: 0.34, radius: action.hitRadius || PLAYER_RADIUS * 1.8, vfx: action.vfx, big: true });
     }
   } else {
-    // 退化：向前（或移動方向）短瞬移 + 小範圍補刀，不給隱身
     let dx = cos, dy = sin;
     const mvLen = Math.hypot(caster.vx || 0, caster.vy || 0);
     if (mvLen > 1) { dx = caster.vx / mvLen; dy = caster.vy / mvLen; }
@@ -73,8 +61,6 @@ export function shadowstrike(ctx: ActionContext) {
   }
 }
 
-// 千影分身：召出 N 個無敵殘影分身，於 duration 內持續環繞最近目標斬擊（逐幀結算在 ninja/clones.ts 的 tick）。
-// 施法者本體的隱身＋無敵窗由 ult 的 action.self 套用（executor）。
 export function shadowflurry(ctx: ActionContext) {
   const { state, caster, silent } = ctx;
   const action = ctx.action as any;
@@ -88,7 +74,6 @@ export function shadowflurry(ctx: ActionContext) {
     timer: 0,
     phase: 0,
   };
-  // 起手大爆（分身現身）：type 'ultimate' → vfx onCast 的大爆＋環狀分身俯衝
   if (!silent) addFx(state, { type: 'ultimate', x: caster.x, y: caster.y, facing: caster.facing, color: action.color, life: 0.6, vfx: action.vfx });
 }
 

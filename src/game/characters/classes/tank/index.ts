@@ -13,6 +13,7 @@ import './talent.ts';
 // 怒氣引擎與數值平衡見同資料夾 talent.ts（天賦 bulwark hooks）。
 const data = {
     id: 'tank', order: 3, evadeType: 'dash', name: '坦克', color: '#7f8c8d', shape: 'square', sprite: characterSprite('tank', '#7f8c8d', true, drawTankTexture), meleeRole: true,
+    snapshotFields: ['fury'],
     maxHp: 480, maxMana: 70, speed: 128,
     desc: '越被打越強的前排堡壘。承傷累積【怒氣】：怒氣越高、受傷越少、反擊越痛，戰意沸騰時加速貼身。巨力踏陣躍入敵陣聚怪定身、守護壁壘分享護盾淨化，大招釋放怒氣震開敵陣、化身不動壁壘為全隊罩上護罩。價值在開團、保護與滾雪球的承傷威脅。',
     role: '前排 · 保護/擾亂',

@@ -25,13 +25,8 @@ export function makePlayer(id: EntityId, name: string, charId: string | number, 
     leap: null,
     channel: null,
     trail: null,
-    barrage: null,
     still: 0,
     combo: 0, comboTimer: 0,
-    chi: 0, chiGainCd: 0, chiIdle: 0, // 格鬥家：氣球(0–5)、命中集氣節流、閒置消散計時
-    fury: 0, furyIdle: 0,
-    iaiTimer: 0,
-    suppressTarget: null, suppressStacks: 0,
     lockTargetId: null,
     ownerId: null,
     summonLife: 0,
@@ -116,8 +111,40 @@ export function createInitialState(
   };
 }
 
+const PROJECTILE_CORE_KEYS = new Set([
+  'dmg',
+  'radius',
+  'lifetime',
+  'color',
+  'knockback',
+  'pierce',
+  'effect',
+  'split',
+  'homing',
+  'pull',
+  'detonate',
+  'leaveZone',
+  'freezeBonus',
+  'vfx',
+  'heal',
+  'srcSlot',
+  'id',
+  'owner',
+  'x',
+  'y',
+  'vx',
+  'vy',
+  'hit',
+]);
+
+function copyProjectileMetadata(target: Projectile, opt: Record<string, any>) {
+  for (const [key, value] of Object.entries(opt)) {
+    if (!PROJECTILE_CORE_KEYS.has(key) && value !== undefined) target[key] = value;
+  }
+}
+
 export function makeProjectile(owner: EntityId, x: number, y: number, vx: number, vy: number, opt: Record<string, any>): Projectile {
-  return {
+  const projectile: Projectile = {
     id: uid(), owner, x, y, vx, vy,
     dmg: opt.dmg, radius: opt.radius, lifetime: opt.lifetime,
     color: opt.color, knockback: opt.knockback || 0,
@@ -130,29 +157,11 @@ export function makeProjectile(owner: EntityId, x: number, y: number, vx: number
     freezeBonus: opt.freezeBonus || 0,
     vfx: opt.vfx || null,
     heal: opt.heal || 0,
-    glassShard: !!opt.glassShard,
-    glassReflects: opt.glassReflects || 0,
-    glassMaxReflects: opt.glassMaxReflects || 0,
-    glassReflectBonus: opt.glassReflectBonus || 0,
-    glassMarkOnReflected: !!opt.glassMarkOnReflected,
-    glassPierceOnReflect: !!opt.glassPierceOnReflect,
-    glassSplitOnMirror: !!opt.glassSplitOnMirror,
-    glassSplitChild: !!opt.glassSplitChild,
-    glassSplitAngle: opt.glassSplitAngle || 0,
-    glassSplitDmgMult: opt.glassSplitDmgMult || 1,
-    glassSplitRadiusMult: opt.glassSplitRadiusMult || 1,
-    glassPassRadiusMult: opt.glassPassRadiusMult || 1,
-    glassReflectRadiusMult: opt.glassReflectRadiusMult || 1,
-    glassChildMaxReflects: opt.glassChildMaxReflects || 0,
-    lastMirrorId: opt.lastMirrorId != null ? opt.lastMirrorId : null,
-    royalCardFan: !!opt.royalCardFan,
-    royalEmpowered: !!opt.royalEmpowered,
-    royalEmpoweredDmg: opt.royalEmpoweredDmg || 0,
-    royalEncoreDmg: opt.royalEncoreDmg || 0,
-    royalJokerHoming: !!opt.royalJokerHoming,
     srcSlot: opt.srcSlot != null ? opt.srcSlot : null,
     hit: {},
   };
+  copyProjectileMetadata(projectile, opt);
+  return projectile;
 }
 
 export function makeZone(owner: EntityId, x: number, y: number, opt: Record<string, any>): Zone {
@@ -170,6 +179,10 @@ export function makeZone(owner: EntityId, x: number, y: number, opt: Record<stri
     pull: opt.pull || 0,
     drainHeal: opt.drainHeal || 0,
     allyHeal: opt.allyHeal || 0,
+    allyHealVfx: opt.allyHealVfx || null,
+    allyHealVfxColor: opt.allyHealVfxColor || null,
+    allyHealVfxLife: opt.allyHealVfxLife || null,
+    allyHealVfxRadius: opt.allyHealVfxRadius || null,
     vfx: opt.vfx || null,
     srcSlot: opt.srcSlot != null ? opt.srcSlot : null,
   };

@@ -4,6 +4,7 @@ import { characterSprite } from '../../textureSprite.ts';
 import { drawBardTexture } from './texture.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import './vfx.ts';
+import './talent.ts';
 
 const data = {
     id: 'bard', order: 12, evadeType: 'dash', name: '吟遊詩人', color: '#e91e63', shape: 'circle', sprite: characterSprite('bard', '#e91e63', false, drawBardTexture),
@@ -14,7 +15,7 @@ const data = {
     talent: { id: 'warsong', name: '戰歌共鳴', desc: '周圍 250 內每多一名友方，自身與友方額外 +5% 傷害（最多 +15%）。', radius: 250, perAlly: 0.05, maxAllies: 3 },
     basic: { name: '音波衝擊', type: 'projectile', dmg: 18, speed: 600, radius: 12, lifetime: 1.3, knockback: 60, cd: 0.5, color: '#ff6fa5', vfx: 'bard_note' },
     skill1: { name: '激昂戰歌', type: 'buff', manaCost: 30, cd: 9, color: '#ff8fb8', vfx: 'bard_anthem', ally: { radius: 300, effect: { kind: 'rage', duration: 6, speed: 1.35, dmg: 1.45 }, vfx: 'bard_anthem_ally', color: '#ff8fb8' } },
-    skill2: { name: '療癒和弦', type: 'projectile', dmg: 40, heal: 50, speed: 760, radius: 22, lifetime: 1.0, pierce: true, knockback: 80, manaCost: 30, cd: 8, color: '#ec407a', effect: { kind: 'stun', duration: 2.5 }, vfx: 'bard_discord' },
+    skill2: { name: '療癒和弦', type: 'projectile', dmg: 40, heal: 50, healVfx: 'bard_heal_hit', speed: 760, radius: 22, lifetime: 1.0, pierce: true, knockback: 80, manaCost: 30, cd: 8, color: '#ec407a', effect: { kind: 'stun', duration: 2.5 }, vfx: 'bard_discord' },
     ultimate: { name: '狂想交響樂', type: 'zone', range: 0, radius: 300, dmg: 16, lifetime: 7.0, tick: 0.5, knockback: 280, follow: true, effect: { kind: 'slow', duration: 1.0, factor: 0.5 }, cd: 12, color: '#ff4081', vfx: 'bard_ultimate', allyHeal: 12, allyEffect: { kind: 'rage', duration: 1.5, speed: 1.25, dmg: 1.45 }, ally: { radius: 400, shield: 120, cleanse: true, vfx: 'bard_ultimate_ally', color: '#ff4081' } },
   };
 

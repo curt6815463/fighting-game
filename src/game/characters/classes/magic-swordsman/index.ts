@@ -8,6 +8,7 @@ import './vfx.ts';
 
 const data = {
   id: 'magic-swordsman', order: 20, evadeType: 'dash', name: '魔劍士', color: '#00d2ff', shape: 'triangle', sprite: characterSprite('magic-swordsman', '#00d2ff', true, drawMagicSwordsmanTexture),
+  snapshotFields: ['magicSwordsman'],
   meleeRole: true,
   maxHp: 230, maxMana: 100, speed: 192,
   desc: '魔武雙修的單手劍士。普攻累積劍氣與魔力，劍氣層數強化技能效果——消耗越多層、招越致命。魔力與劍氣的雙資源取捨是操作核心。',

@@ -9,6 +9,7 @@ import './talent.ts';
 
 const data = {
     id: 'fighter', order: 9, evadeType: 'dash', name: '格鬥家', color: '#f1c40f', shape: 'circle', sprite: characterSprite('fighter', '#f1c40f', true, drawFighterTexture), meleeRole: true,
+    snapshotFields: ['chi'],
     maxHp: 260, maxMana: 80, speed: 196,
     desc: '聚氣爆發的武僧。聚氣每按一次凝聚一顆氣球（最多 5），每顆同時強化拳勁與護體；不動明王短暫金身免傷立於不敗；氣滿時拳速與身法俱增；大招真·昇龍霸傾盡全身氣勁化龍撲擊、氣球越多威勢越猛。自給自足、愈打愈強。',
     role: '近戰 · 蓄氣爆發',

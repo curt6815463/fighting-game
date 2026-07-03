@@ -18,8 +18,8 @@ const data = {
     synergy: '靠普攻鋪滿時咒(扣血＋拖慢冷卻)，再用 K 緩速控場或 L 高額引爆爆發；大招重置後可連續引爆。脆皮、需走位風箏，配能咬住目標的隊友把握引爆窗口最佳。',
     talent: { id: 'causality', name: '因果', desc: '對帶有時咒的敵人，自身造成的傷害 +15%；帶時咒的敵人死亡時，剩餘時咒擴散給周圍 220 內的敵人（連同扣血與冷卻拖慢）。', curseAmp: 0.15, radius: 220, cdRefund: 1.5 },
     basic: { name: '時咒彈', type: 'projectile', dmg: 6, speed: 540, radius: 12, lifetime: 1.4, knockback: 18, cd: 0.55, color: '#b07cff', effect: { kind: 'timehex', stacks: 1, max: 10, duration: 8, vulnPer: 0, dmgPerStack: 1.5, cdSlowPer: 0.04 }, vfx: 'chronohex_bolt' },
-    skill1: { name: '凝滯咒', type: 'projectile', dmg: 20, speed: 600, radius: 13, lifetime: 1.1, knockback: 30, manaCost: 25, cd: 9, color: '#80deea', detonate: { perStack: 16, consume: true, stun: 1.0, stunPerStack: 0.10, slow: { duration: 3, factor: 0.5 }, slowPerStack: 0.35, slowFactorPerStack: 0.02, slowFactorMin: 0.35 }, vfx: 'chronohex_bolt' },
-    skill2: { name: '災厄咒', type: 'projectile', dmg: 28, speed: 640, radius: 13, lifetime: 1.1, knockback: 30, manaCost: 30, cd: 11, color: '#b07cff', detonate: { perStack: 34, consume: true, stun: 1.0, stunPerStack: 0.10 }, vfx: 'chronohex_bolt' },
+    skill1: { name: '凝滯咒', type: 'projectile', dmg: 20, speed: 600, radius: 13, lifetime: 1.1, knockback: 30, manaCost: 25, cd: 9, color: '#80deea', detonate: { effectKind: 'timehex', perStack: 16, consume: true, stun: 1.0, stunPerStack: 0.10, slow: { duration: 3, factor: 0.5 }, slowPerStack: 0.35, slowFactorPerStack: 0.02, slowFactorMin: 0.35 }, vfx: 'chronohex_bolt' },
+    skill2: { name: '災厄咒', type: 'projectile', dmg: 28, speed: 640, radius: 13, lifetime: 1.1, knockback: 30, manaCost: 30, cd: 11, color: '#b07cff', detonate: { effectKind: 'timehex', perStack: 34, consume: true, stun: 1.0, stunPerStack: 0.10 }, vfx: 'chronohex_bolt' },
     ultimate: { name: '時序重構', type: 'chronoreset', shield: 220, shieldDuration: 6, cd: 12, color: '#7c5cff', vfx: 'chronohex_ultimate' },
   };
 

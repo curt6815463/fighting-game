@@ -1,6 +1,4 @@
 // 天賦 summonbond（戰靈護主）：身邊存活的召喚物越多，主人受到的傷害越低。
-// 註：另有「召喚物命中敵人時回血給主人」的互動仍內聯於 damage.ts（召喚物本身無天賦，
-// 屬跨實體 owner 邏輯，之後可隨 onTick/aura hook 一併搬移）。
 import { registerTalent } from '../../talents/registry';
 
 // 數在場召喚物層數（上限 maxStacks）。受傷減免與傷害加成共用此計數。
@@ -22,5 +20,8 @@ registerTalent('summonbond', {
     if (!per) return dmg;
     const n = bondStacks(state, attacker, talent);
     return n > 0 ? dmg * (1 + n * per) : dmg;
+  },
+  onOwnedMinionDealt({ state, owner, talent, applyHeal }) {
+    applyHeal(state, owner, talent.heal || 5);
   },
 });

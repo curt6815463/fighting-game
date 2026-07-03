@@ -13,6 +13,8 @@ interface EffectDef {
   apply?: EffectApply;      // 缺省 → genericApply
   cleanseable?: boolean;    // debuff = true（會被 cleanse 清除）；增益省略
   hud?: EffectHud;          // 狀態列顯示中繼資料（與邏輯 co-located，新增效果只改這一處）
+  cooldownRate?: (effect: any, p: Player, state: any) => number;
+  damageTakenRate?: (effect: any, p: Player, state: any) => number;
 }
 
 // 通用衰減型效果（slow/stun/haste/rage/overdrive/frozen/evading/invis…）的缺省寫入。
@@ -89,12 +91,15 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
         burstCap: data.burstCap != null ? data.burstCap : 250,  // 引爆上限
         burstRadius: data.burstRadius || 150,
         spreadDur: data.spreadDur || 3,                         // 擴散出的弱寄生持續時間
+        color: data.color,
+        burstColor: data.burstColor,
+        burstVfx: data.burstVfx,
         srcId: srcId,
         srcSlot: data.srcSlot,
       };
     },
   },
-  // 劇毒：可「無限疊加」的 DoT（刺客專屬）。每層每 tick 造成 dmgPerStack 傷害（結算在 systems/effects.ts）。
+  // 劇毒：可「無限疊加」的 DoT。每層每 tick 造成 dmgPerStack 傷害（結算在 systems/effects.ts）。
   poison: {
     cleanseable: true,
     hud: { icon: '🧪', name: '劇毒', buff: false },
@@ -112,7 +117,7 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
       };
     },
   },
-  // 時咒（時厄術士專屬）：堆疊式時空詛咒。每層 →
+  // 時咒：堆疊式時空詛咒。每層 →
   //   ・承受傷害 +vulnPer（易傷，結算於 damage.ts）
   //   ・每 tick 蝕傷 stacks×dmgPerStack（低，結算於 systems/effects.ts；DPS 不高）
   //   ・**技能冷卻流速 −cdSlowPer/層**（惱人：被咒時技能/閃避回得更慢，結算於 playerState.tickCooldowns）
@@ -121,6 +126,10 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
   timehex: {
     cleanseable: true,
     hud: { icon: '⌛', name: '時咒', buff: false },
+    cooldownRate: (effect) => effect && effect.stacks > 0
+      ? Math.max(0.5, 1 - effect.stacks * (effect.cdSlowPer || 0.07))
+      : 1,
+    damageTakenRate: (effect) => 1 + (effect.stacks || 0) * (effect.vulnPer || 0.04),
     apply: (p, _k, data, srcId) => {
       const cur = p.effects.timehex;
       const max = data.max || 5;
@@ -193,6 +202,8 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
         stacks, max,
         factor: Math.max(0.35, 1 - 0.16 * stacks),
         freezeDur: data.freezeDur || 1.1,
+        freezeColor: data.freezeColor,
+        freezeVfx: data.freezeVfx,
         froze: cur ? cur.froze : false,
         srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
       };
@@ -265,6 +276,24 @@ const CLEANSEABLE = Object.keys(EFFECT_DEFS).filter((k) => EFFECT_DEFS[k].cleans
 // 不必再同步維護 render3d/hud.js 的第二份 icon/name 表。回傳 null = 不在狀態列顯示。
 export function getEffectHud(kind: string): EffectHud | null {
   return EFFECT_DEFS[kind]?.hud || null;
+}
+
+export function getEffectsCooldownRate(p: Player, state: any): number {
+  let rate = 1;
+  for (const [kind, effect] of Object.entries(p.effects || {})) {
+    const def = EFFECT_DEFS[kind];
+    if (def?.cooldownRate) rate *= def.cooldownRate(effect, p, state);
+  }
+  return rate;
+}
+
+export function getEffectsDamageTakenRate(p: Player, state: any): number {
+  let rate = 1;
+  for (const [kind, effect] of Object.entries(p.effects || {})) {
+    const def = EFFECT_DEFS[kind];
+    if (def?.damageTakenRate) rate *= def.damageTakenRate(effect, p, state);
+  }
+  return rate;
 }
 
 export function applyEffect(p: Player, kind: EffectKind, data?: any, srcId?: EntityId) {

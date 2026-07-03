@@ -1,9 +1,12 @@
 // @ts-nocheck
 // 能量共振柱召喚物模板 (id: -7)
 import * as THREE from 'three';
+import { registerMinion } from '../../characters/minions/index.ts';
+
+export const PYLON_MINION_ID = -7;
 
 export const pylonMinion = {
-  id: -7,
+  id: PYLON_MINION_ID,
   name: '能量共振柱',
   color: '#ffaa00',
   shape: 'circle',
@@ -63,5 +66,7 @@ export const pylonMinion = {
     return parts;
   }
 };
+
+registerMinion(pylonMinion);
 
 export default pylonMinion;

@@ -1,8 +1,8 @@
 // 動作系統的型別。
 //
-// 動作系統採 registry 模式（actions/handlers/**/index.ts 以 import.meta.glob 自動註冊）：
-// 每個 action 的 `type` 對應一個 ActionHandler。新增 action 只要在 handlers/ 下加一個
-// 資料夾匯出 `{ handlers: { <type>: fn } }` 即可，無需改 executor。
+// 動作系統採 registry 模式（actions/handlers/** 與 characters/classes/*/actions/** 自動註冊）：
+// 每個 action 的 `type` 對應一個 ActionHandler。新增共用或角色專屬 action 只要在對應
+// actions/ 資料夾匯出 `{ handlers: { <type>: fn } }` 即可，無需改 executor。
 
 import type { GameState } from './engine';
 import type { Player, EffectSpec, EntityId } from './entities';
@@ -28,13 +28,6 @@ export interface Input {
 export type ActionType =
   | 'projectile' | 'melee' | 'dash' | 'blink' | 'charge' | 'leap'
   | 'grapple' | 'multiblink' | 'channel' | 'zone' | 'buff' | 'summon'
-  | 'samurai_iaijutsu'
-  | 'star_orbit_guard' | 'star_orbit_cannon' | 'star_orbit_burst'
-  | 'glass_shard' | 'glass_mirror' | 'glass_ray' | 'glass_beam' | 'glass_kaleidoscope'
-  | 'royal_card_fan' | 'royal_smoke_blink' | 'royal_theater' | 'royal_hat_trick'
-  // 闖關魔王專屬
-  | 'summon_clones' | 'summon_minions' | 'apply_scramble' | 'time_rewind'
-  | 'soul_bind' | 'light_dark' | 'mirror_players' | 'steal_ultimate'
   | (string & {});
 
 /** 對自己施放的增益（任何 action 皆可附帶）。 */

@@ -16,7 +16,7 @@ const data = {
     talent: { id: 'arcane_flow', name: '奧術迴流', desc: '法術命中敵人時回復 8 點魔力。', mana: 8 },
     basic: { name: '奧術飛彈', type: 'projectile', dmg: 26, speed: 460, radius: 14, lifetime: 1.6, knockback: 60, cd: 0.6, color: '#7aa2ff', vfx: 'mage_fireball' },
     skill1: { name: '烈焰吐息', type: 'projectile', dmg: 18, speed: 540, radius: 13, lifetime: 0.45, count: 5, spread: 0.32, knockback: 40, manaCost: 45, cd: 6, color: '#ff9f43', effect: { kind: 'burn', duration: 2, tick: 0.5, dmg: 5 }, freezeBonus: 1.6, vfx: 'mage_flamebreath' },
-    skill2: { name: '寒冰矛', type: 'projectile', dmg: 55, speed: 780, radius: 12, lifetime: 0.7, pierce: true, knockback: 50, manaCost: 45, cd: 8, color: '#74e0ff', effect: { kind: 'chill', stacks: 4, duration: 3, max: 4, freezeDur: 4 }, vfx: 'mage_iceshard' },
+    skill2: { name: '寒冰矛', type: 'projectile', dmg: 55, speed: 780, radius: 12, lifetime: 0.7, pierce: true, knockback: 50, manaCost: 45, cd: 8, color: '#74e0ff', effect: { kind: 'chill', stacks: 4, duration: 3, max: 4, freezeDur: 4, freezeVfx: 'mage_iceshard', freezeColor: '#9fe8ff' }, vfx: 'mage_iceshard' },
     ultimate: { name: '天降流星', type: 'zone', range: 150, radius: 140, dmg: 420, lifetime: 0.4, tick: 0.4, delay: 0.8, effect: { kind: 'burn', duration: 3, tick: 0.5, dmg: 10 }, cd: 11, color: '#ff5a3c', vfx: 'mage_ultimate' },
   };
 

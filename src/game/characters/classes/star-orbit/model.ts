@@ -407,7 +407,34 @@ export function buildModel(ctx) {
   beamR.castShadow = true;
   trailR.add(beamR);
 
-  return { torso, head, armL, armR, legL, legR, starOrbitShards, cape, capeTrim };
+  return {
+    torso,
+    head,
+    armL,
+    armR,
+    legL,
+    legR,
+    attachments: [cape, capeTrim, ...starOrbitShards],
+    customUpdate(dt, _group, ud, info) {
+      const orbit = info.p && info.p.starOrbit;
+      const count = Math.max(0, Math.min(3, orbit?.shards ?? 0));
+      const baseAngle = orbit?.angle ?? ud.breathe * 1.9;
+      for (let i = 0; i < starOrbitShards.length; i++) {
+        const shard = starOrbitShards[i];
+        shard.visible = i < count;
+        if (!shard.visible) continue;
+        const a = baseAngle + i * (Math.PI * 2 / Math.max(1, count));
+        const r = 56 + count * 10;
+        shard.position.set(Math.cos(a) * r, 31 + Math.sin(a * 2) * 4, Math.sin(a) * r);
+        shard.rotation.x += dt * 1.2;
+        shard.rotation.y += dt * 2.8;
+        shard.rotation.z += dt * 0.8;
+        shard.scale.setScalar(1 + Math.sin(ud.breathe * 2 + i) * 0.035);
+      }
+      cape.rotation.z = Math.sin(ud.breathe * 0.8) * 0.06;
+      capeTrim.rotation.z = Math.sin(ud.breathe * 0.8 + 0.3) * 0.08;
+    },
+  };
 }
 
 export const buildWeapon = buildStarOrbitWeapon;

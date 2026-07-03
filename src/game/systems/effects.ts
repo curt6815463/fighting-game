@@ -1,38 +1,32 @@
 import { PLAYER_RADIUS } from '../constants.js';
 import { getCharacter } from '../characters.js';
+import { getTalentHooks } from '../characters/talents/registry';
 import { dealDamage, hatchParasite } from '../entities/damage.ts';
 import { applyEffect } from '../entities/effects.ts';
 import { applyHeal } from '../entities/heal.ts';
 import { addFx } from '../entities/fx.ts';
 import type { GameState, Player, EntityId } from '../types';
 
-function dotLifesteal(state: GameState, srcId: EntityId | null | undefined, dmg: number) {
-  if (srcId == null || !dmg) return;
+function dotTalentCtx(state: GameState, srcId: EntityId | null | undefined, target: Player, effect: any, kind: string, dmg: number) {
+  if (srcId == null) return null;
   const src = state.players[srcId];
-  if (!src || !src.alive) return;
+  if (!src || !src.alive) return null;
   const talent = getCharacter(src.charId).talent;
-  if (talent && talent.id === 'undeath') applyHeal(state, src, dmg * (talent.factor || 0.15));
+  return { state, source: src, target, effect, kind, dmg, talent };
 }
 
-// 刺客「劇毒」天賦（virulence）：對中毒目標的毒傷一部分轉為治療給來源（黏著續戰＝保命）。
-function poisonLifesteal(state: GameState, srcId: EntityId | null | undefined, dmg: number) {
-  if (srcId == null || !dmg) return;
-  const src = state.players[srcId];
-  if (!src || !src.alive) return;
-  const talent = getCharacter(src.charId).talent;
-  if (talent && talent.id === 'virulence') applyHeal(state, src, dmg * (talent.lifesteal || 0.3));
+function modifyDotDamage(state: GameState, srcId: EntityId | null | undefined, target: Player, effect: any, kind: string, dmg: number) {
+  const ctx = dotTalentCtx(state, srcId, target, effect, kind, dmg);
+  if (!ctx) return dmg;
+  const hook = getTalentHooks(ctx.talent?.id)?.modifyDotDamage;
+  return hook ? hook(ctx) : dmg;
 }
 
-// 死靈「亡者之觸」收割：來源帶 undeath 天賦、且目標殘血(低於門檻)時，DoT 每跳傷害放大。
-// 把慢性 DoT 變成能真正收尾的處決手段（其餘來源回傳 1，不受影響）。
-function necroDotMult(state: GameState, srcId: EntityId | null | undefined, target: Player): number {
-  if (srcId == null) return 1;
-  const src = state.players[srcId];
-  if (!src || !src.alive) return 1;
-  const talent = getCharacter(src.charId).talent;
-  if (!talent || talent.id !== 'undeath' || !talent.execBonus) return 1;
-  const frac = target.maxHp ? target.hp / target.maxHp : 1;
-  return frac <= (talent.execThreshold || 0.35) ? 1 + talent.execBonus : 1;
+function onDotDealt(state: GameState, srcId: EntityId | null | undefined, target: Player, effect: any, kind: string, dmg: number) {
+  if (!dmg) return;
+  const ctx = dotTalentCtx(state, srcId, target, effect, kind, dmg);
+  if (!ctx) return;
+  getTalentHooks(ctx.talent?.id)?.onDotDealt?.({ ...ctx, applyHeal });
 }
 
 export function tickStatusEffects(state: GameState, p: Player, dt: number) {
@@ -52,9 +46,9 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        const dmg = effect.dmg * necroDotMult(state, effect.srcId, p);
+        const dmg = modifyDotDamage(state, effect.srcId, p, effect, kind, effect.dmg);
         dealDamage(state, p, dmg, effect.srcId, { source: effect.srcSlot });
-        dotLifesteal(state, effect.srcId, dmg);
+        onDotDealt(state, effect.srcId, p, effect, kind, dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#ff6b3d', life: 0.3, radius: PLAYER_RADIUS });
       }
     } else if (kind === 'bleed') {
@@ -62,9 +56,9 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt * (moving ? effect.moveMult : 1);
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        const dmg = effect.dmg * necroDotMult(state, effect.srcId, p);
+        const dmg = modifyDotDamage(state, effect.srcId, p, effect, kind, effect.dmg);
         dealDamage(state, p, dmg, effect.srcId, { source: effect.srcSlot });
-        dotLifesteal(state, effect.srcId, dmg);
+        onDotDealt(state, effect.srcId, p, effect, kind, dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#e84141', life: 0.3, radius: PLAYER_RADIUS });
       }
     } else if (kind === 'poison') {
@@ -72,9 +66,10 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        const dmg = (effect.stacks || 1) * (effect.dmgPerStack || 3) * necroDotMult(state, effect.srcId, p);
+        const baseDmg = (effect.stacks || 1) * (effect.dmgPerStack || 3);
+        const dmg = modifyDotDamage(state, effect.srcId, p, effect, kind, baseDmg);
         dealDamage(state, p, dmg, effect.srcId, { dot: true, source: effect.srcSlot });
-        poisonLifesteal(state, effect.srcId, dmg);
+        onDotDealt(state, effect.srcId, p, effect, kind, dmg);
         addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#7ee787', life: 0.3, radius: PLAYER_RADIUS });
       }
     } else if (kind === 'timehex') {
@@ -90,10 +85,10 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
       effect.tickTimer -= dt;
       if (effect.tickTimer <= 0) {
         effect.tickTimer += effect.tick;
-        const dmg = effect.dmg * necroDotMult(state, effect.srcId, p);
+        const dmg = modifyDotDamage(state, effect.srcId, p, effect, kind, effect.dmg);
         dealDamage(state, p, dmg, effect.srcId, { dot: true, source: effect.srcSlot });
-        dotLifesteal(state, effect.srcId, dmg);
-        addFx(state, { type: 'burn', x: p.x, y: p.y, color: '#1abc9c', life: 0.3, radius: PLAYER_RADIUS });
+        onDotDealt(state, effect.srcId, p, effect, kind, dmg);
+        addFx(state, { type: 'burn', x: p.x, y: p.y, color: effect.color || '#7ee787', life: 0.3, radius: PLAYER_RADIUS });
       }
       // 時間到 → 孵化引爆（DoT 已先擊殺者由死亡區引爆，此處以 p.alive 防重複）。
       if (effect.remaining <= 0 && p.alive) hatchParasite(state, p);
@@ -103,7 +98,7 @@ export function tickStatusEffects(state: GameState, p: Player, dt: number) {
         applyEffect(p, 'stun', { duration: effect.freezeDur });
         applyEffect(p, 'frozen', { duration: effect.freezeDur });
         effect.remaining = 0;
-        addFx(state, { type: 'hit', x: p.x, y: p.y, color: '#9fe8ff', life: 0.4, radius: PLAYER_RADIUS * 2.5, vfx: 'mage_iceshard' });
+        addFx(state, { type: 'hit', x: p.x, y: p.y, color: effect.freezeColor || '#9fe8ff', life: 0.4, radius: PLAYER_RADIUS * 2.5, vfx: effect.freezeVfx || null });
       }
     } else if (kind === 'regen_hot') {
       effect.tickTimer -= dt;

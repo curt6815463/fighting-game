@@ -3,6 +3,7 @@ import { getBossForRound } from '../src/game/bosses.js';
 import { makePlayer, makeBoss, createInitialState } from '../src/game/entities/factories.ts';
 import { executeAction } from '../src/game/actions/executor.ts';
 import { tickBossSystems } from '../src/game/bosses/systems.ts';
+import { BUBBLE_MINION_ID } from '../src/game/bosses/tidal-siren/bubble.ts';
 
 describe('Round 6 Tidal Siren', () => {
   it('is registered as Round 6', () => {
@@ -84,7 +85,7 @@ describe('Round 6 Tidal Siren', () => {
     executeAction(state, boss, getBossForRound(6)!.skill2);
 
     // 驗證水泡小兵生成
-    const bubble = Object.values(state.players).find((o: any) => o.isMinion && o.charId === -3);
+    const bubble = Object.values(state.players).find((o: any) => o.isMinion && o.charId === BUBBLE_MINION_ID);
     expect(bubble).toBeTruthy();
     expect((bubble as any).trappedPlayerId).toBe(player.id);
 

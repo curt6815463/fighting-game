@@ -4,6 +4,7 @@ import { SLOW, STUN } from '../effects.js';
 import { aiProfile } from './ai.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { loadVfx } from './vfx.ts';
+import { PYLON_MINION_ID } from './pylon.ts';
 import './action.ts'; // Ensure custom actions are registered
 import { ARENA } from '../../constants.js';
 import { addFx } from '../../entities/fx.ts';
@@ -16,7 +17,7 @@ export function spawnPylons(state: any, boss: any) {
   // 移除場上舊的能量柱與警告圈
   for (const key of Object.keys(state.players)) {
     const o = state.players[key];
-    if (o.isMinion && o.charId === -7 && o.ownerId === boss.id) {
+    if (o.isMinion && o.charId === PYLON_MINION_ID && o.ownerId === boss.id) {
       o.alive = false;
       delete state.players[key];
     }
@@ -42,7 +43,7 @@ export function spawnPylons(state: any, boss: any) {
 
     const pylonId = boss.id + '-pylon-' + idx + '-' + Math.random().toString(36).slice(2, 7);
 
-    const pylonMinion = makeBoss(pylonId, -7, px, py, boss.team, {
+    const pylonMinion = makeBoss(pylonId, PYLON_MINION_ID, px, py, boss.team, {
       isMinion: true,
       ownerId: boss.id,
       aiId: 'fake', // 無 AI
@@ -209,7 +210,7 @@ const data = {
   modifyIncomingDamage(state: any, boss: any, attacker: any, dmg: number) {
     let pylonsAlive = 0;
     for (const o of Object.values(state.players) as any[]) {
-      if (o.isMinion && o.charId === -7 && o.ownerId === boss.id && o.alive) {
+      if (o.isMinion && o.charId === PYLON_MINION_ID && o.ownerId === boss.id && o.alive) {
         pylonsAlive++;
       }
     }
@@ -291,7 +292,7 @@ const data = {
 
     // 4. 繪製共振柱與 Boss 之間的粒子能量流
     for (const o of Object.values(state.players) as any[]) {
-      if (o.isMinion && o.charId === -7 && o.ownerId === boss.id && o.alive) {
+      if (o.isMinion && o.charId === PYLON_MINION_ID && o.ownerId === boss.id && o.alive) {
         // 固定能量共振柱位置在原地
         if (o.spawnX != null && o.spawnY != null) {
           o.x = o.spawnX;
@@ -347,7 +348,7 @@ const data = {
     // 清理場上遺留的共振柱與警告圈
     for (const key of Object.keys(state.players)) {
       const o = state.players[key];
-      if (o.isMinion && o.charId === -7) {
+      if (o.isMinion && o.charId === PYLON_MINION_ID) {
         o.alive = false;
         delete state.players[key];
       }

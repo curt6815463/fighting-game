@@ -103,7 +103,7 @@ describe('simulation pipeline', () => {
       'status-effects',
       'passive-recovery',
       'channels',
-      'barrage',
+      'character-combat',
       'scripted-action',
       'items',
       'auto-lock',

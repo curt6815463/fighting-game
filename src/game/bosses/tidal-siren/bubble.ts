@@ -1,9 +1,12 @@
 // @ts-nocheck
-// 水泡禁錮小兵模板 (id: -3)
+// 水泡禁錮小兵模板 (id: -8)
 import * as THREE from 'three';
+import { registerMinion } from '../../characters/minions/index.ts';
+
+export const BUBBLE_MINION_ID = -8;
 
 export const bubbleMinion = {
-  id: -3,
+  id: BUBBLE_MINION_ID,
   name: '深海水泡',
   color: '#0a9396',
   shape: 'circle',
@@ -70,5 +73,7 @@ export const bubbleMinion = {
     return parts;
   }
 };
+
+registerMinion(bubbleMinion);
 
 export default bubbleMinion;

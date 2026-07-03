@@ -43,7 +43,7 @@ export function applyMovement(p: Player, input: Input, dt: number, difficulty = 
     if (dx || dy) {
       const l = Math.hypot(dx, dy);
       dx /= l; dy /= l;
-      if (input.aim == null && !p.chargeState && !p.barrage) p.facing = Math.atan2(dy, dx);
+      if (input.aim == null && !p.chargeState && !p.actionFacingLock) p.facing = Math.atan2(dy, dx);
       if (!rooted) {
         const moveSpeed = p.chargeState ? speedOf(p, difficulty) * 0.5 : speedOf(p, difficulty); // 蓄力時減速從 0.35 放寬到 0.5
         targetVx = dx * moveSpeed;

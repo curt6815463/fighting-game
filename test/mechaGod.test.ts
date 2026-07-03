@@ -5,6 +5,7 @@ import { makePlayer, makeBoss, createInitialState } from '../src/game/entities/f
 import { executeAction } from '../src/game/actions/executor.ts';
 import { tickBossSystems } from '../src/game/bosses/systems.ts';
 import { applyBossDamageModifiers } from '../src/game/bosses/damage.ts';
+import { PYLON_MINION_ID } from '../src/game/bosses/mecha-god/pylon.ts';
 
 describe('Round 9 Mecha God', () => {
   it('is registered as Round 9', () => {
@@ -31,7 +32,7 @@ describe('Round 9 Mecha God', () => {
     tickBossSystems(state, 0.1);
 
     // 驗證是否生成了 能量共振柱
-    const pylons = Object.values(state.players).filter((o: any) => o.isMinion && o.charId === -7);
+    const pylons = Object.values(state.players).filter((o: any) => o.isMinion && o.charId === PYLON_MINION_ID);
     expect(pylons.length).toBe(2);
 
     // 當能量柱存活時，傷害減免 90% (即只受 10% 傷害)

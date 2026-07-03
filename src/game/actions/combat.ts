@@ -1,5 +1,6 @@
 import { PLAYER_RADIUS } from '../constants.js';
 import { getCharacter } from '../characters.js';
+import { getTalentHooks } from '../characters/talents/registry';
 import { angleDiff, dist } from '../entities/math.ts';
 import { dealDamage, hatchParasite } from '../entities/damage.ts';
 import { applyEffect } from '../entities/effects.ts';
@@ -13,34 +14,33 @@ export function bodyR(o: { hitR?: number }): number {
   return o.hitR || PLAYER_RADIUS;
 }
 
-// 輸出傷害倍率：殘血加成 / 血怒 / 過載 / 居合就緒。a 為動作物件（可能是合成 action）。
+// 輸出傷害倍率：殘血加成 / 血怒 / 過載。a 為動作物件（可能是合成 action）。
 export function outMult(p: Player, a: any): number {
   let m = 1;
   if (a.lowHpBonus) m *= 1 + (1 - p.hp / p.maxHp);
   if (p.effects.rage) m *= p.effects.rage.dmg;
   if (p.effects.overdrive && p.effects.overdrive.dmg) m *= p.effects.overdrive.dmg;
-  if (p.iaiReady) {
-    const t = getCharacter(p.charId).talent;
-    m *= 1 + ((t && t.bonus) || 0.8);
-  }
   return m;
 }
 
-export function applyEffectFrom(state: GameState, target: Player, effect: any, srcId: EntityId, source?: string | null) {
+function modifyAppliedEffect(state: GameState, source: Player | undefined, target: Player, effect: any) {
   let e = effect;
+  if (source) {
+    const talent = getCharacter(source.charId).talent;
+    const hook = getTalentHooks(talent?.id)?.modifyAppliedEffect;
+    if (hook) e = hook({ state, source, target, effect: e, talent, role: 'source' }) || e;
+  }
+  const targetTalent = getCharacter(target.charId).talent;
+  const targetHook = getTalentHooks(targetTalent?.id)?.modifyAppliedEffect;
+  if (targetHook) e = targetHook({ state, source, target, effect: e, talent: targetTalent, role: 'target' }) || e;
+  return e;
+}
+
+export function applyEffectFrom(state: GameState, target: Player, effect: any, srcId: EntityId, source?: string | null) {
   const src = state.players[srcId];
   // DPS 歸因：DoT 記住來源 slot（呼叫端 source 優先，否則回退施法者同步施放期的 _srcSlot）。
   const srcSlot = source != null ? source : (src && src._srcSlot != null ? src._srcSlot : null);
-  if (src && effect.kind === 'burn') {
-    const t = getCharacter(src.charId).talent;
-    if (t && t.id === 'pyromancy') {
-      e = { ...effect, dmg: Math.round((effect.dmg || 0) * (t.burnDmg || 1.5)), duration: (effect.duration || 2) * (t.burnDur || 1.4) };
-    }
-  }
-  if (effect.kind === 'chill' && (effect.stacks || 1) >= (effect.max || 4)) {
-    const tt = getCharacter(target.charId).talent;
-    if (tt && tt.id === 'pyromancy') e = { ...e, stacks: 1 };
-  }
+  const e = modifyAppliedEffect(state, src, target, effect);
   if (e.kind === 'shield') {
     applyShield(state, target, e.amount, e.duration || 5);
     return;
