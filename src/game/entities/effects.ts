@@ -169,6 +169,18 @@ const EFFECT_DEFS: Record<string, EffectDef> = {
       };
     },
   },
+  encore: {
+    cleanseable: true,
+    hud: { icon: '♠', name: '安可', buff: false },
+    apply: (p, _k, data, srcId) => {
+      const cur = p.effects.encore;
+      p.effects.encore = {
+        remaining: Math.max(cur ? cur.remaining : 0, data.duration || 2),
+        srcId: srcId != null ? srcId : (cur ? cur.srcId : undefined),
+        srcSlot: data.srcSlot != null ? data.srcSlot : (cur ? cur.srcSlot : undefined),
+      };
+    },
+  },
   chill: {
     cleanseable: true,
     hud: { icon: '❄️', name: '冰寒', buff: false },

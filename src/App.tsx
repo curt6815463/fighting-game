@@ -13,6 +13,7 @@ import { GameScreen } from './components/GameScreen';
 import { GameOverScreen } from './components/GameOverScreen';
 import { AudioSettingsButton } from './components/AudioSettingsButton';
 import { TrainingOverlay } from './components/TrainingOverlay';
+import { ModelGalleryScreen } from './components/ModelGalleryScreen';
 import type { AppPhase, ControlScheme, GameFlags, GameOverView, LobbyView, TrainingStatsView } from './types';
 
 const EMPTY_LOBBY: LobbyView = { players: [], selfId: null, isHost: false, roomCode: '', gameFlags: { freeMana: false, noCooldown: false, noDamage: false, difficulty: 0 }, lobbyMode: 'expedition', bossRound: 1 };
@@ -26,7 +27,7 @@ const ALL_SFX_NAMES = [
   ...GENERIC_SFX,
 ];
 
-export function App() {
+function GameApp() {
   const controller = getController();
   const [phase, setPhase] = useState<AppPhase>('menu');
   const [lobby, setLobby] = useState<LobbyView>(EMPTY_LOBBY);
@@ -181,4 +182,10 @@ export function App() {
       <AudioSettingsButton canLeave={phase !== 'menu'} onLeave={() => controller.leave()} />
     </>
   );
+}
+
+export function App() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('gallery') === 'models') return <ModelGalleryScreen />;
+  return <GameApp />;
 }

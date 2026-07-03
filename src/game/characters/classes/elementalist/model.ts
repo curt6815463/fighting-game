@@ -182,7 +182,7 @@ export function buildModel(ctx) {
   // Floating Ribbons hanging from the hair knot
   for (const sz of [-1, 1]) {
     const ribbon = new THREE.Mesh(new THREE.BoxGeometry(0.8 * bulk, 22.0 * bulk, 2.5 * bulk), stormMat);
-    ribbon.position.set(-8.5 * bulk, -10.0 * bulk, sz * 4.5 * bulk);
+    ribbon.position.set(-8.5 * bulk, 26.0 * bulk, sz * 4.5 * bulk);
     ribbon.rotation.set(0.12 * sz, 0.2 * sz, 0.08 * sz);
     addAccent(ribbon);
   }
@@ -248,6 +248,8 @@ export function buildModel(ctx) {
   // C. Dynamic Sway Trails (Wave-like ornate streamers replacing flat boards)
   const cape = new THREE.Group();
   const capeTrim = new THREE.Group();
+  cape.position.y = torsoH * 3.15;
+  capeTrim.position.y = torsoH * 3.15;
 
   const trailMats = [fireMat, stormMat, iceMat];
 
