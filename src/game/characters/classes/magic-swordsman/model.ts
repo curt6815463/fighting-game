@@ -560,7 +560,44 @@ export function buildModel(ctx) {
     arm.add(pGroup);
   }
 
-  return { torso, head, armL, armR, legL, legR, swordEnergyOrbs, extraOrbs, cape, capeTrim };
+  return {
+    torso,
+    head,
+    armL,
+    armR,
+    legL,
+    legR,
+    attachments: [cape, capeTrim, ...swordEnergyOrbs, ...extraOrbs],
+    customUpdate(dt, _group, ud, info) {
+      const se = info.p && info.p.magicSwordsman;
+      const count = se ? Math.max(0, Math.min(5, se.swordEnergy || 0)) : 0;
+      const baseY = 18;
+      for (let i = 0; i < swordEnergyOrbs.length; i++) {
+        const orb = swordEnergyOrbs[i];
+        orb.visible = i < count;
+        if (!orb.visible) continue;
+        const a = ud.breathe * 1.4 + i * (Math.PI * 2 / Math.max(1, count));
+        const r = 48 + count * 3;
+        orb.position.set(Math.cos(a) * r, baseY + Math.sin(a * 1.5 + i * 1.2) * 8, Math.sin(a) * r);
+        orb.rotation.x += dt * 1.6;
+        orb.rotation.y += dt * 2.5;
+        orb.rotation.z += dt * 1.0;
+        orb.scale.setScalar(1 + Math.sin(ud.breathe * 3 + i * 1.5) * 0.08);
+      }
+      for (let i = 0; i < extraOrbs.length; i++) {
+        const extra = extraOrbs[i];
+        const a = ud.breathe * 0.6 + i * (Math.PI * 2 / 3);
+        const r = 62;
+        extra.position.set(Math.cos(a) * r, 22 + Math.sin(a * 2 + i) * 5, Math.sin(a) * r);
+        extra.rotation.x += dt * 0.8;
+        extra.rotation.y += dt * 1.2;
+        extra.rotation.z += dt * 0.4;
+        extra.scale.setScalar(1 + Math.sin(ud.breathe * 1.5 + i) * 0.05);
+      }
+      cape.rotation.z = Math.sin(ud.breathe * 0.8) * 0.06;
+      capeTrim.rotation.z = Math.sin(ud.breathe * 0.8 + 0.3) * 0.08;
+    },
+  };
 }
 
 export const buildWeapon = buildMagicSwordsmanWeapon;

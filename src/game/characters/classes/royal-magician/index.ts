@@ -9,6 +9,7 @@ import './vfx.ts';
 
 const data = {
   id: 'royal-magician', order: 22, evadeType: 'blink', name: '皇家魔術師', color: '#c9184a', shape: 'diamond', sprite: characterSprite('royal-magician', '#c9184a', false, drawRoyalMagicianTexture),
+  snapshotFields: ['royalCards'],
   maxHp: 190, maxMana: 110, speed: 190,
   desc: '中距離花色連段法師。特色【皇家手牌】花色組合，普攻命中隨機獲得紅/藍牌，1/10 機率抽到鬼牌 (Joker)。魔術飛刀消耗手牌，根據組合爆發傷害；若手牌已滿 4 張仍超抽將觸發「魔力反噬」，丟光所有手牌並獲得 50 護盾、移速減 30% 持續 3 秒，且傷害減 90% 持續 10 秒！',
   role: '中距離 · 花色連段',

@@ -3,7 +3,7 @@ import { EMPTY_INPUT } from '../../input.js';
 import { computeBossInput } from '../../bossAI.js';
 import { computeNpcInput } from '../../npcAI.ts';
 import { castInputActions } from '../../actions/casting.ts';
-import { processBarrage, processChannel, processScripted, processTrail } from '../../actions/runtime.ts';
+import { processChannel, processScripted, processTrail } from '../../actions/runtime.ts';
 import { applyPlayerAutoLock } from '../autoLock.ts';
 import { tickStatusEffects } from '../effects.ts';
 import { tickDropItems, useHpPotion, useMpPotion } from '../items.ts';
@@ -92,8 +92,8 @@ export const PLAYER_SYSTEMS = [
     tick: ({ state, player, dt }: PlayerPipelineContext) => processChannel(state, player, dt),
   },
   {
-    id: 'barrage',
-    tick: ({ state, player, dt }: PlayerPipelineContext) => processBarrage(state, player, dt),
+    id: 'character-combat',
+    tick: ({ state, player, character, dt }: PlayerPipelineContext) => character?.combatTick?.(state, player, dt),
   },
   {
     id: 'scripted-action',

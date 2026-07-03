@@ -6,7 +6,7 @@ import { applyBossDamageModifiers } from '../bosses/damage.ts';
 import { getBoss } from '../bosses.js';
 import { addFx } from './fx.ts';
 import { applyHeal } from './heal.ts';
-import { applyEffect } from './effects.ts';
+import { applyEffect, getEffectsDamageTakenRate } from './effects.ts';
 import { recordDamage, recordKill, recordDeath } from './stats.ts';
 import { isAlly, isEnemy } from './team.ts';
 import { spawnDropFromMinion } from '../systems/items.ts';
@@ -18,19 +18,16 @@ import type { GameState, Player, EntityId } from '../types';
 // 傷害管線的天賦邏輯已改為「與角色 co-located 的 hook registry」（characters/talents/registry.ts）：
 // 各角色 classes/<slug>/talent.ts 內 registerTalent('<id>', { modifyOutgoing/modifyIncoming/
 // onDealt/onAttacked })，本檔在 hot-path 依序查 registry 後呼叫，順序與原內聯一致。
-//   - talentDamageMods(): target.modifyIncoming → attacker.modifyOutgoing →（warsong aura 仍內聯）
+//   - talentDamageMods(): target.modifyIncoming → attacker.modifyOutgoing → 場上 aura hooks
 //   - dealDamage onAttacked 區: retribution（受擊反傷）
 //   - dealDamage onDealt 區: 造成傷害後副作用（arcane_flow/bloodlust/momentum/suppress…）
 // 新增「會影響傷害」的天賦＝加一個 talent.ts 註冊 hook，不必再改本檔。
 //
 // 生命週期 hook（playerState / casting）也走 registry：cooldownRate(bloodlust 攻速) /
-// onTimers(iaido 計時) / onRecovery(lifebloom 回血) / onCastResolved(timeprism)。
+// onTimers(iaido 計時) / onRecovery(lifebloom 回血) / beforeActionExecute/onCastResolved。
 //
-// 仍內聯、尚未納入 registry 的天賦邏輯（aura / 跨實體 / 與施放序列緊密耦合）：
-//   • entities/damage.ts   warsongFor()(warsong aura) / spreadTimehex()(causality 死亡傳染+回沖CD) /
-//                          summonbond 召喚物命中回主（owner 經召喚物，非攻擊方天賦）
-//   • systems/effects.ts      undeath(DoT 汲取回血，見 dotLifesteal)
-//   • actions/combat.ts       pyromancy(強化 burn) ；actions/casting.ts iaido 居合就緒判定
+// 仍內聯、尚未納入 registry 的跨角色戰鬥邏輯：
+//   • 近戰角色命中回血（meleeRole 是角色類型標籤，不是單一天賦）
 // 註：bulwark（坦克 鋼鐵壁壘）已實作於 classes/tank/talent.ts（modifyIncoming 減傷＋怒氣引擎）。
 //     unbreakable 目前仍僅有資料定義，未見對應減傷邏輯（疑為待補）。
 // ──────────────────────────────────────────────────────────────────
@@ -38,55 +35,6 @@ import type { GameState, Player, EntityId } from '../types';
 // 建立傳給天賦 hook 的情境（注入副作用 helper，避免 talent.ts 反向匯入 entities/* 造成循環）。
 function talentCtx(state: GameState, attacker: Player, target: Player, dmg: number, talent: any): TalentCtx {
   return { state, attacker, target, dmg, talent, applyHeal, addFx };
-}
-
-function warsongFor(state: GameState, attacker: Player): number {
-  let best = 0;
-  for (const bard of Object.values(state.players)) {
-    if (!bard.alive) continue;
-    const talent = getCharacter(bard.charId).talent;
-    if (!talent || talent.id !== 'warsong') continue;
-    if (!(bard.id === attacker.id || isAlly(state, bard.id, attacker))) continue;
-    const radius = talent.radius || 250;
-    if (Math.hypot(bard.x - attacker.x, bard.y - attacker.y) > radius) continue;
-    let allies = 0;
-    for (const other of Object.values(state.players)) {
-      if (!other.alive) continue;
-      if (!(other.id === bard.id || isAlly(state, bard.id, other))) continue;
-      if (Math.hypot(bard.x - other.x, bard.y - other.y) <= radius) allies++;
-    }
-    best = Math.max(best, Math.min(talent.maxAllies || 3, Math.max(0, allies - 1)) * (talent.perAlly || 0.05));
-  }
-  return best;
-}
-
-// 時厄術士 天賦「因果」：帶時咒的敵人死亡 → 剩餘時咒（半數層）擴散給周圍敵人，
-// 並回沖時厄術士自身的技能冷卻（節奏引擎）。掃描全場找帶 causality 天賦者。
-function spreadTimehex(state: GameState, corpse: Player) {
-  let mage: Player | null = null;
-  for (const other of Object.values(state.players)) {
-    if (!other.alive) continue;
-    const talent = getCharacter(other.charId).talent;
-    if (talent && talent.id === 'causality') { mage = other; break; }
-  }
-  if (!mage) return;
-  const hex = corpse.effects.timehex;
-  if (!hex) return;
-  const mt = getCharacter(mage.charId).talent;
-  const radius = mt.radius || 220;
-  const half = Math.max(1, Math.ceil((hex.stacks || 1) / 2));
-  for (const other of Object.values(state.players)) {
-    if (other.id === corpse.id || !isEnemy(state, mage.id, other)) continue;
-    if (Math.hypot(other.x - corpse.x, other.y - corpse.y) <= radius) {
-      applyEffect(other, 'timehex', { stacks: half, duration: hex.remaining, vulnPer: hex.vulnPer, dmgPerStack: hex.dmgPerStack }, mage.id);
-    }
-  }
-  // 節奏引擎：回沖技能冷卻（縮短 skill1/skill2/ultimate）
-  const refund = mt.cdRefund || 1.5;
-  if (mage.cd) for (const slot of ['skill1', 'skill2', 'ultimate']) {
-    if (mage.cd[slot] > 0) mage.cd[slot] = Math.max(0, mage.cd[slot] - refund);
-  }
-  addFx(state, { type: 'buff', x: corpse.x, y: corpse.y, color: '#b07cff', life: 0.4, radius, vfx: 'chronohex_field' });
 }
 
 // 孵化寄生引爆：對宿主與半徑內敵人造成累積爆傷，並把弱化寄生擴散到附近敵人。
@@ -99,7 +47,15 @@ export function hatchParasite(state: GameState, host: Player) {
   const burst = Math.min(par.burstCap || 250, (par.stored || 0) * (par.burstMult || 1));
   const radius = par.burstRadius || 150;
   const srcId = par.srcId;
-  addFx(state, { type: 'hit', x: host.x, y: host.y, color: '#1abc9c', life: 0.4, radius, vfx: 'archer_parasite' });
+  addFx(state, {
+    type: 'hit',
+    x: host.x,
+    y: host.y,
+    color: par.burstColor || par.color || '#7ee787',
+    life: 0.4,
+    radius,
+    vfx: par.burstVfx || null,
+  });
   for (const o of Object.values(state.players)) {
     if (!o.alive) continue;
     if (srcId != null && o.id === srcId) continue; // 不打施法者
@@ -113,6 +69,7 @@ export function hatchParasite(state: GameState, host: Player) {
         vuln: par.vuln, vulnStep: 0, vulnMax: par.vulnMax,
         store: 0, burstMult: par.burstMult, burstCap: par.burstCap,
         burstRadius: radius, spreadDur: 0,
+        color: par.color, burstColor: par.burstColor, burstVfx: par.burstVfx,
       }, srcId);
     }
   }
@@ -129,11 +86,27 @@ function talentDamageMods(state: GameState, attacker: Player, target: Player, am
     const at = getCharacter(attacker.charId).talent;
     const ah = at && getTalentHooks(at.id);
     if (ah?.modifyOutgoing) dmg = ah.modifyOutgoing(talentCtx(state, attacker, target, dmg, at));
-    // warsong 為 aura（掃描友方 bard），非攻擊方自身天賦，暫留內聯。
-    const warsong = warsongFor(state, attacker);
-    if (warsong > 0) dmg *= 1 + warsong;
+    let auraDmg = dmg;
+    for (const owner of Object.values(state.players)) {
+      if (!owner.alive) continue;
+      const talent = getCharacter(owner.charId).talent;
+      const hook = getTalentHooks(talent?.id)?.outgoingAura;
+      if (!hook) continue;
+      const next = hook({ state, owner, attacker, target, dmg, talent, isAlly });
+      if (next > auraDmg) auraDmg = next;
+    }
+    dmg = auraDmg;
   }
   return dmg;
+}
+
+function runEntityDeathTalentHooks(state: GameState, corpse: Player, killer: Player | undefined) {
+  for (const owner of Object.values(state.players)) {
+    if (!owner.alive) continue;
+    const talent = getCharacter(owner.charId).talent;
+    const hook = getTalentHooks(talent?.id)?.onEntityDeath;
+    if (hook) hook({ state, owner, corpse, killer, talent, applyEffect, addFx, isEnemy });
+  }
 }
 
 export function dealDamage(
@@ -188,7 +161,7 @@ export function dealDamage(
   if (target.isBoss) dmg = applyBossDamageModifiers(state, target, attacker, dmg);
   if (target.effects && target.effects.mark) dmg *= 1 + target.effects.mark.bonus;
   if (target.effects && target.effects.parasite) dmg *= 1 + (target.effects.parasite.vuln || 0);
-  if (target.effects && target.effects.timehex) dmg *= 1 + (target.effects.timehex.stacks || 0) * (target.effects.timehex.vulnPer || 0.04);
+  dmg *= getEffectsDamageTakenRate(target, state);
   // 破綻窗口：Boss / 部位 (含 owner Boss 的破綻) 收招期間受傷 +30% (重招破綻 +45%)
   if (hostile && target.isBoss && (target.recoverWindow || 0) > 0) {
     dmg *= target.recoverHeavy ? 1.45 : 1.3;
@@ -365,12 +338,12 @@ export function dealDamage(
     const ah = at && getTalentHooks(at.id);
     if (ah?.onDealt) ah.onDealt(talentCtx(state, attacker, target, dmg, at));
   }
-  // summonbond：召喚物命中敵人時回血給主人（owner 經召喚物觸發，非攻擊方自身天賦，暫留內聯）。
   if (hostile && attacker.isMinion && attacker.ownerId) {
     const owner = state.players[attacker.ownerId];
     if (owner && owner.alive) {
       const ownerTalent = getCharacter(owner.charId).talent;
-      if (ownerTalent && ownerTalent.id === 'summonbond') applyHeal(state, owner, ownerTalent.heal || 5);
+      const hook = getTalentHooks(ownerTalent?.id)?.onOwnedMinionDealt;
+      if (hook) hook({ state, owner, minion: attacker, target, dmg, talent: ownerTalent, applyHeal });
     }
   }
 
@@ -386,7 +359,7 @@ export function dealDamage(
     }
     recordKill(state, attackerId, target);
     recordDeath(state, target);
-    if (target.effects && target.effects.timehex) spreadTimehex(state, target);
+    runEntityDeathTalentHooks(state, target, killer);
     if (target.effects && target.effects.parasite) hatchParasite(state, target);
     const bossDeathVfx = target.isBoss && state.mode === 'boss' ? getBoss(target.charId as number)?.data?.deathVfx : null;
     if (!bossDeathVfx) {

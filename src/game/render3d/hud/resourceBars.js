@@ -1,6 +1,6 @@
 // HUD resource bar registry.
 //
-// Character-specific self resource bars (fury, sword energy, etc.) live here
+// Character-specific self resource bars live here
 // instead of growing render3d/hud.js with one branch per character.
 
 const RESOURCE_BARS = [];
@@ -15,12 +15,17 @@ export function registerHudResourceBar(def) {
 
 export function updateHudResourceBars(ctx, slots) {
   for (const slot of Object.values(slots)) {
-    if (slot && slot.wrap) slot.wrap.style.display = 'none';
+    if (!slot || !slot.wrap) continue;
+    slot.wrap.style.display = 'none';
+    if (slot.baseClass) slot.wrap.className = slot.baseClass;
+    if (slot.wrap.classList && slot.wrap.classList.toggle) slot.wrap.classList.toggle('boiling', false);
   }
 
   for (const bar of RESOURCE_BARS) {
     const slot = slots[bar.slotId || bar.id];
     if (!slot || !bar.matches(ctx)) continue;
+    if (slot.baseClass) slot.wrap.className = slot.baseClass;
+    if (slot.wrap.classList && slot.wrap.classList.toggle) slot.wrap.classList.toggle(bar.className || bar.id, true);
     slot.wrap.style.display = '';
     bar.update(ctx, slot);
   }

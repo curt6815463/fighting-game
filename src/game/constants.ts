@@ -32,11 +32,6 @@ export const ULT_GAIN_DEAL = 0.02;       // 造成傷害的充能係數 (× 傷�
 export const ULT_GAIN_TAKE = 0.04;       // 承受傷害的充能係數 (逆境略快，給翻盤機會)
 export const ULT_LOCKOUT = 8;            // 施放後的防連發冷卻 (秒)；各大招另以 ult.cd 覆蓋
 
-// ---- 怒氣 (Fury) — 坦克專屬資源 ----
-// 僅「鋼鐵壁壘」天賦 (bulwark) 使用：承受/造成傷害累積，脫戰衰減。怒氣越高＝受傷越少、反擊越痛、
-// 戰意沸騰加速貼身。非坦克角色 fury 恆為 0（HUD 亦只在 bulwark 顯示怒氣條）。
-export const FURY_MAX = 100;
-
 // ---- Boss 基礎攻擊頻率參數 (影響 AI 出招節奏) ----
 // 所有魔王共用同一組基礎頻率設定，修改此處即可調整整體戰鬥節奏。
 export const BOSS_PACING = {

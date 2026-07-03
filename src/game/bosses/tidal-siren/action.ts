@@ -1,6 +1,8 @@
 import { registerBossAction } from '../actions.ts';
 import { makeZone } from '../../entities/factories.ts';
 
+import { BUBBLE_MINION_ID } from './bubble.ts';
+
 registerBossAction('summon_bubble', (state, boss, a, h) => {
   // 尋找活著且未被困住的敵對玩家
   const enemies = (Object.values(state.players) as any[]).filter(
@@ -11,7 +13,7 @@ registerBossAction('summon_bubble', (state, boss, a, h) => {
   // 檢查已被困的玩家，避免重複點名
   const trappedIds = new Set();
   for (const o of Object.values(state.players) as any[]) {
-    if (o.isMinion && o.charId === -3 && o.alive && o.trappedPlayerId) {
+    if (o.isMinion && o.charId === BUBBLE_MINION_ID && o.alive && o.trappedPlayerId) {
       trappedIds.add(o.trappedPlayerId);
     }
   }
@@ -45,7 +47,7 @@ registerBossAction('summon_bubble', (state, boss, a, h) => {
     shouldStun = true;
   }
 
-  const bubbleMinion = h.makeBoss(bubbleId, -3, target.x, target.y, h.BOSS_TEAM, {
+  const bubbleMinion = h.makeBoss(bubbleId, BUBBLE_MINION_ID, target.x, target.y, h.BOSS_TEAM, {
     isMinion: true,
     ownerId: boss.id,
     aiId: 'fake', // 無 AI 動作

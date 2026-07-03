@@ -15,7 +15,7 @@ import { createHud } from './render3d/hud.js';
 import { applyDecorations, updateDecorationFade } from './render3d/decorations.js';
 import { createAtmosphere } from './render3d/atmosphere.js';
 import { createBossUltimateAura } from './render3d/bossUltimateAura.js';
-import { createFighterChiLayer } from './render3d/fighterChi.js';
+import { createWorldOverlayManager } from './render3d/worldOverlays.js';
 import { createTimeAnchorLayer } from './render3d/timeAnchors.js';
 import { createPerfHud } from './render3d/perfHud.js';
 import { getBossForRound, getBoss } from './bosses.js';
@@ -26,6 +26,8 @@ import { getCharacter } from './characters.js';
 import { prepareSkin, instantiateSkin } from './render3d/skins.js';
 import { WALK_THRESHOLD } from './constants.js';
 import { getSfxManager } from '../utils/sfxManager';
+
+import.meta.glob('./characters/classes/*/worldOverlay.js', { eager: true });
 
 // cd 槽位 + 動作類型 → 出手姿勢 (swing 揮砍/出拳 | cast 施法/舉手)
 const CD_SLOTS = ['basic', 'skill1', 'skill2', 'ultimate'];
@@ -61,7 +63,7 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl', hooks = {}) {
   const hud = createHud({ stage: sceneMgr.stage, scene, camera, controlScheme, hooks });
   const atmosphere = createAtmosphere(particles);
   const bossUltimateAura = createBossUltimateAura({ scene, particles, sceneMgr });
-  const fighterChi = createFighterChiLayer(scene);
+  const worldOverlays = createWorldOverlayManager(scene);
   const timeAnchorLayer = createTimeAnchorLayer(scene);
   const perfHud = createPerfHud(sceneMgr, sceneMgr.stage); // ?perf=1 才啟用，否則為 null
   let hideSelf = false; // 第一人稱(mode 2)時藏自身模型
@@ -214,7 +216,7 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl', hooks = {}) {
       animateModel(e.group, dt, { speed, facing: p.facing, p, isSelf: p.id === selfId, attack: attackKind, hurt, downed, fake: !!p.isFake, ...bossVisual });
 
       // ---- 音效 (renderer-side 本地偵測；host+joiner 各自播放；缺檔靜音不報錯) ----
-      // 每個技能各自的音色：以「<charId>_<技能槽>」(如 warrior_basic、healer_ultimate) 查找，
+      // 每個技能各自的音色：以「<charId>_<技能槽>」查找，
       // 缺檔回退泛型 (swing/cast/dash/blink/ultimate)。魔王/召喚物為數字 id，自然回退泛型。
       if (sfxName) {
         const primary = `${p.charId}_${sfxSlot}`;
@@ -562,7 +564,7 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl', hooks = {}) {
       syncPlayers(state, selfId, dt);
       syncTethers(state, dt);
       bossUltimateAura.sync(state.players, dt);
-      fighterChi.sync(state.players, dt, getEntityScenePos);
+      worldOverlays.sync(state, dt, getEntityScenePos);
       timeAnchorLayer.sync(state.timeAnchors || [], state.timeAnchorRitual, dt);
 
       updateHuntMarker(state, dt);
@@ -625,5 +627,5 @@ export function createRenderer(canvas, controlScheme = 'wasd-jkl', hooks = {}) {
     }
   }
 
-  return { render, dispose: () => { bossUltimateAura.dispose(); timeAnchorLayer.dispose(); for (const line of tetherLines.values()) { scene.remove(line.group); line.geo.dispose(); line.coreMat.dispose(); line.glowMat.dispose(); } } };
+  return { render, dispose: () => { bossUltimateAura.dispose(); worldOverlays.dispose(); timeAnchorLayer.dispose(); for (const line of tetherLines.values()) { scene.remove(line.group); line.geo.dispose(); line.coreMat.dispose(); line.glowMat.dispose(); } } };
 }

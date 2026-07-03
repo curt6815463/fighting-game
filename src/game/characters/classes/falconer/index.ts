@@ -10,6 +10,7 @@ import './talent.ts';
 
 const data = {
     id: 'falconer', order: 19, evadeType: 'dash', name: '鳥獵', color: '#e0a82e', shape: 'circle',
+    snapshotFields: ['_falcon'],
     sprite: characterSprite('falconer', '#e0a82e', true, drawFalconerTexture),
     maxHp: 185, maxMana: 90, speed: 200,
     desc: '攻速爆擊型獵手，類 RO 弓獵。本體箭傷不高，靠極快攻速與鷹瞳爆擊（每第三發必爆 +70%）穩定輸出；肩上鷹隼自動「獵鷹突擊」多段連擊＋濺射補回輸出，索敵範圍大、走位時也持續吃傷。鷹擊·震退讓鷹飛出把貼臉的敵人強力擊退保命；鷹眼凝視必爆＋放大鷹的觸發範圍；大招鷹擊風暴喚鷹連續俯衝、範圍更大且每趟把敵群推開。身板極脆，靠走位與擊退節奏苟活。',

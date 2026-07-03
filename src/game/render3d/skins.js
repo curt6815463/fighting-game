@@ -25,32 +25,6 @@ const FOOTPRINT_FILL = 6;
 const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\/+/, '')}`;
 const modelUrl = (slug, format) => asset(`assets/characters/${slug}/model.${format}`);
 
-// charId -> 職業資源資料夾 slug
-const CHAR_SLUGS = [
-  'warrior',
-  'mage',
-  'assassin',
-  'tank',
-  'archer',
-  'healer',
-  'berserker',
-  'ninja',
-  'elementalist',
-  'fighter',
-  'paladin',
-  'chronohex',
-  'bard',
-  'samurai',
-  'gunner',
-  'summoner',
-  'necromancer',
-];
-
-// charId -> 檔案格式
-const CHAR_FORMATS = {
-  0: 'gltf',
-};
-
 // 各動作的候選 clip 名稱 (對照 humanoid.glb 內建動畫)
 const DEFAULT_CLIPS = {
   idle: ['idle', 'Idle'],
@@ -62,19 +36,22 @@ const DEFAULT_CLIPS = {
 
 // 每角色覆寫：微調人形的朝向、大小或高度
 const DEFAULT_CFG = { scaleMul: 0.38, yOffset: 0, rotationY: Math.PI / 2 };
+const FORMAT_OVERRIDES = {
+  warrior: 'gltf',
+};
 const OVERRIDES = {
-  3: { scaleMul: 0.46 }, // 坦克稍微大一點
-  6: { scaleMul: 0.42 }, // 狂戰士稍微大一點
+  tank: { scaleMul: 0.46 }, // 坦克稍微大一點
+  berserker: { scaleMul: 0.42 }, // 狂戰士稍微大一點
 };
 
 export function getSkinConfig(charId) {
-  const slug = CHAR_SLUGS[charId] || CHAR_SLUGS[0];
-  const format = CHAR_FORMATS[charId] || 'glb';
+  const slug = typeof charId === 'string' ? charId : String(charId || 'warrior');
+  const format = FORMAT_OVERRIDES[slug] || 'glb';
   return {
     url: modelUrl(slug, format),
     clips: DEFAULT_CLIPS,
     ...DEFAULT_CFG,
-    ...(OVERRIDES[charId] || {}),
+    ...(OVERRIDES[slug] || {}),
   };
 }
 

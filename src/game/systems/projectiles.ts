@@ -95,10 +95,10 @@ export function updateProjectiles(state: GameState, dt: number) {
             type: 'hit',
             x: o.x,
             y: o.y,
-            color: '#5cffa6',
-            life: 0.25,
+            color: projectile.healVfxColor || '#5cffa6',
+            life: projectile.healVfxLife || 0.25,
             radius: o.hitR * 1.5,
-            vfx: 'bard_heal_hit'
+            vfx: projectile.healVfx || null
           });
         }
       }
@@ -127,11 +127,13 @@ export function updateProjectiles(state: GameState, dt: number) {
         }
         if (projectile.effect) applyEffectFrom(state, o, projectile.effect, projectile.owner, projectile.srcSlot);
         runProjectileHitHooks({ state, projectile, target: o });
-        // 時厄術士 K/L：命中引爆目標時咒層數 —— 傷害／暈眩／緩速「全部隨層數放大」，可選擇是否消耗層數。
+        // Data-driven stacked-effect detonation. Skills choose which effect kind
+        // to consume via detonate.effectKind and how each stack scales damage/CC.
         if (projectile.detonate) {
           const det = projectile.detonate;
-          const hex = o.effects && o.effects.timehex;
-          const stacks = hex ? (hex.stacks || 0) : 0;
+          const effectKind = det.effectKind || det.kind || null;
+          const effect = effectKind && o.effects ? o.effects[effectKind] : null;
+          const stacks = effect ? (effect.stacks || 0) : 0;
           if (stacks > 0 && det.perStack) {
             dealDamage(state, o, stacks * det.perStack, projectile.owner, { source: projectile.srcSlot });
           }
@@ -145,7 +147,7 @@ export function updateProjectiles(state: GameState, dt: number) {
             if (det.slowFactorPerStack) factor = Math.max(det.slowFactorMin || 0.3, factor - det.slowFactorPerStack * stacks);
             if (slowDur > 0) applyEffect(o, 'slow', { duration: slowDur, factor });
           }
-          if (det.consume && hex) delete o.effects.timehex;
+          if (det.consume && effectKind && effect) delete o.effects[effectKind];
           if (stacks > 0) addFx(state, { type: 'hit', x: o.x, y: o.y, color: projectile.color, life: 0.35, radius: 40 + stacks * 6, vfx: projectile.vfx });
         }
         addFx(state, { type: 'hit', x: projectile.x, y: projectile.y, color: projectile.color, life: 0.2, radius: projectile.radius * 2, vfx: projectile.vfx });

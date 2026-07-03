@@ -13,6 +13,8 @@
 // （stats 只送 _retryCount、陣列給 || []），保留為下方的顯式特例。
 // ──────────────────────────────────────────────────────────────────
 
+import { getCharacter } from '../characters.js';
+
 /** 要過網路、且「原樣複製」的玩家欄位（單一事實來源）。新增同步欄位＝append 一行。 */
 export const NET_PLAYER_FIELDS = [
   // 身分
@@ -21,15 +23,13 @@ export const NET_PLAYER_FIELDS = [
   'x', 'y', 'facing', 'kvx', 'kvy',
   // 生命 / 資源 / 狀態
   'hp', 'maxHp', 'mana', 'maxMana', 'alive', 'shield', 'shieldTime', 'kills',
-  'ult', 'fury', 'chi', 'magicSwordsman', 'effects', 'cd', 'chargeState',
+  'ult', 'effects', 'cd', 'chargeState',
   'itemHp', 'itemMp',
   // 魔王 / 召喚物 / 部位 / 鏡像 渲染旗標
   'isBoss', 'isPart', 'isMinion', 'isFake', 'isMirror',
   'ownerId', 'partId', 'partColor', 'scale', 'reviveProg',
   // HUD / 渲染額外線索：倒地判定(aiId)、引導光束(channel)、破綻窗口、相位覆寫、鎖定目標
   'aiId', 'channel', 'recoverWindow', 'recoverHeavy', 'phaseTagsOverride', 'lockTargetId',
-  // Boss-specific multiplayer display markers.
-  'magneticPolarity', 'magnetOverload',
 ] as const;
 
 /** 要過網路、且「原樣複製」的頂層狀態欄位（players 與含預設值者另外處理）。 */
@@ -42,15 +42,36 @@ export const NET_STATE_FIELDS = [
   'projectiles', 'zones', 'fx',
 ] as const;
 
-export function serializeNetworkPlayer(p: any) {
+function addFields(out: Set<string>, fields: readonly string[] | undefined | null) {
+  if (!fields) return;
+  for (const field of fields) out.add(field);
+}
+
+function getBossSnapshotConfig(state: any) {
+  const bossEntity = state?.bossId != null ? state.players?.[state.bossId] : null;
+  return bossEntity ? getCharacter(bossEntity.charId) : null;
+}
+
+export function getNetworkPlayerFields(state: any, p: any) {
+  const fields = new Set<string>(NET_PLAYER_FIELDS as readonly string[]);
+  addFields(fields, getCharacter(p.charId)?.snapshotFields);
+
+  const bossConfig = getBossSnapshotConfig(state);
+  addFields(fields, bossConfig?.playerSnapshotFields);
+  if (state?.bossId != null && p.id === state.bossId) addFields(fields, bossConfig?.snapshotFields);
+
+  return fields;
+}
+
+export function serializeNetworkPlayer(p: any, state?: any) {
   const out: Record<string, any> = {};
-  for (const k of NET_PLAYER_FIELDS) out[k] = p[k];
+  for (const k of getNetworkPlayerFields(state, p)) out[k] = p[k];
   return out;
 }
 
 export function serializeNetworkSnapshot(state: any) {
   const players: Record<string, any> = {};
-  for (const id of Object.keys(state.players)) players[id] = serializeNetworkPlayer(state.players[id]);
+  for (const id of Object.keys(state.players)) players[id] = serializeNetworkPlayer(state.players[id], state);
 
   const out: Record<string, any> = { players };
   for (const k of NET_STATE_FIELDS) out[k] = state[k];

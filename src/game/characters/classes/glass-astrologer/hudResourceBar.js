@@ -3,7 +3,8 @@ import { registerHudResourceBar } from '../../../render3d/hud/resourceBars.js';
 
 registerHudResourceBar({
   id: 'glass-mirrors',
-  slotId: 'fury',
+  slotId: 'primary',
+  className: 'glass-mirrors',
   order: 30,
   matches({ character }) {
     return !!(character && character.id === 'glass-astrologer');

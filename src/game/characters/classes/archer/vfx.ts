@@ -12,7 +12,7 @@ registerVfx('archer_ultimate', {
     ctx.sceneMgr.addFlash(0.2, '#7bed9f');
 
     // 施法起手：精靈之風法陣（雙環）＋ 朝正面的羽風爆發。
-    // 注意：磅礴雙翼已改為「跟隨角色」的模型部件（archer/model.ts barrageWings + models.js animateModel），
+    // 注意：磅礴雙翼已改為「跟隨角色」的模型部件（archer/model.ts customUpdate），
     //       施法時自動展開，故此處不再生成脫離角色的暫態翅膀。
     ring(ctx, c, { color: '#7bed9f', from: 10, to: 110, life: 0.55, y: 4, ease: true });
     ring(ctx, c, { color: '#ffffff', from: 6, to: 60, life: 0.32, y: 10, alpha: 0.9 });
@@ -360,4 +360,3 @@ registerVfx('archer_parasite', {
     }
   }
 });
-

@@ -46,7 +46,7 @@ export function buildModel(ctx) {
   const legL = mkLimb(0, -hipX, false, defaultBodyMat, defaultBootMat, base);
   const legR = mkLimb(0, hipX, false, defaultBodyMat, defaultBootMat, base);
 
-  // 天羽箭暴 — 磅礴發光雙翼：預設收合隱藏，大招連射時展開並隨角色移動（由 models.js animateModel 依 p.barrage 驅動）。
+  // 天羽箭暴 — 磅礴發光雙翼：預設收合隱藏，大招連射時展開並隨角色移動（由本角色 customUpdate 依 p.barrage 驅動）。
   // 結構：每側一個 side 群組，內含數片以「根部」為樞紐的羽片(pivot)；展開時各 pivot 繞前後軸外擺成扇形。
   const featherMat = reg(mat(0xffffff, { emissive: base, ei: 3.4, transparent: true, opacity: 0.95 }));
   featherMat.blending = THREE.AdditiveBlending;
@@ -77,7 +77,34 @@ export function buildModel(ctx) {
   barrageWings.visible = false;
   barrageWings.userData.mat = featherMat;
 
-  return { torso, head, armL, armR, legL, legR, barrageWings };
+  return {
+    torso,
+    head,
+    armL,
+    armR,
+    legL,
+    legR,
+    attachments: [barrageWings],
+    customUpdate(dt, _group, ud, info) {
+      const on = info.p && info.p.barrage;
+      ud.archerWingT = on ? Math.min(1, (ud.archerWingT || 0) + dt * 3.0)
+                          : Math.max(0, (ud.archerWingT || 0) - dt * 4.5);
+      barrageWings.visible = ud.archerWingT > 0.001;
+      if (!barrageWings.visible) return;
+      const e = ud.archerWingT * ud.archerWingT * (3 - 2 * ud.archerWingT);
+      const flap = Math.sin(ud.breathe * 5) * 0.14;
+      for (const side of barrageWings.children) {
+        const sz = side.userData.side;
+        const feathers = side.userData.feathers;
+        for (let i = 0; i < feathers.length; i++) {
+          const fan = feathers[i].userData.fan;
+          feathers[i].rotation.x = sz * (0.05 + fan * 1.05 * e + flap * (0.4 + i * 0.12) * e);
+        }
+      }
+      barrageWings.scale.setScalar(0.7 + 0.6 * e);
+      if (barrageWings.userData.mat) barrageWings.userData.mat.opacity = 0.25 + 0.72 * e;
+    },
+  };
 }
 
 export const buildWeapon = buildArcherWeapon;

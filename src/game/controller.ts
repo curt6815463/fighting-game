@@ -52,7 +52,7 @@ import type {
 
 // 網路快照序列化已抽到 ./network/snapshot.ts（宣告式欄位 manifest）。
 // 此處 re-export 維持既有引用點（含 test/networkSnapshot.test.ts）不需改動。
-export { serializeNetworkPlayer, serializeNetworkSnapshot } from './network/snapshot';
+export { NET_PLAYER_FIELDS, serializeNetworkPlayer, serializeNetworkSnapshot } from './network/snapshot';
 
 // ---------- 加入者效能量測 (?perf=1) ----------
 // 量化加入者卡頓來源：每包大小 (含 fx / projectiles 佔比)、反序列化處理、buildView 插值耗時、

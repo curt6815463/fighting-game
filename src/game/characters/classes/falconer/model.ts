@@ -92,7 +92,63 @@ export function buildModel(ctx) {
   const legL = mkLimb(0, -hipX, false, defaultBodyMat, defaultBootMat, base);
   const legR = mkLimb(0, hipX, false, defaultBodyMat, defaultBootMat, base);
 
-  return { torso, head, armL, armR, legL, legR, falcon };
+  return {
+    torso,
+    head,
+    armL,
+    armR,
+    legL,
+    legR,
+    attachments: [falcon],
+    customUpdate(dt, _group, ud, info) {
+      const p = info.p;
+      const rest = falcon.userData.rest;
+      const wings = falcon.userData.wings || [];
+      const fl = p && p._falcon && p._falcon.flight;
+      ud.falconFlap = (ud.falconFlap || 0) + dt * (fl ? 26 : 6);
+      if (fl) {
+        const u = Math.min(1, fl.t / (fl.dur || 0.62));
+        const arc = Math.sin(u * Math.PI);
+        const th = ud.curFacing || 0;
+        const c2 = Math.cos(th);
+        const s2 = Math.sin(th);
+        const wx = fl.tdx || 0;
+        const wz = fl.tdy || 0;
+        const lx = wx * c2 - wz * s2;
+        const lz = wx * s2 + wz * c2;
+        const dirx = lx - rest.x;
+        const dirz = lz - rest.z;
+        const dl = Math.hypot(dirx, dirz) || 1;
+        const perpx = -dirz / dl;
+        const perpz = dirx / dl;
+        const lateral = Math.sin(u * Math.PI * 2) * Math.min(70, dl * 0.22);
+        falcon.position.x = rest.x + dirx * arc + perpx * lateral;
+        falcon.position.z = rest.z + dirz * arc + perpz * lateral;
+        falcon.position.y = rest.y + (24 - rest.y) * arc + Math.sin(u * Math.PI) * 8;
+        const hx = falcon.position.x - (ud.falPrevX != null ? ud.falPrevX : falcon.position.x);
+        const hz = falcon.position.z - (ud.falPrevZ != null ? ud.falPrevZ : falcon.position.z);
+        if (Math.hypot(hx, hz) > 0.05) falcon.rotation.y = Math.atan2(-hz, hx);
+        ud.falPrevX = falcon.position.x;
+        ud.falPrevZ = falcon.position.z;
+        falcon.rotation.z = -arc * 0.4 + lateral * 0.01;
+        const flap = Math.sin(ud.falconFlap) * 0.6;
+        for (const w of wings) w.rotation.x = w.userData.side * (0.2 + flap);
+        const storm = p && p._falcon && p._falcon.frenzy ? 1.3 : 1;
+        falcon.scale.setScalar((falcon.userData.baseScale || 1) * (1.5 + arc * 0.5) * storm);
+      } else {
+        falcon.position.x += (rest.x - falcon.position.x) * Math.min(1, dt * 10);
+        falcon.position.z += (rest.z - falcon.position.z) * Math.min(1, dt * 10);
+        falcon.position.y = rest.y + Math.sin(ud.breathe * 2) * 0.6;
+        falcon.rotation.z += (0 - falcon.rotation.z) * Math.min(1, dt * 10);
+        falcon.rotation.y += (0 - falcon.rotation.y) * Math.min(1, dt * 10);
+        falcon.scale.setScalar(falcon.userData.baseScale || 1);
+        ud.falPrevX = null;
+        ud.falPrevZ = null;
+        const flap = Math.sin(ud.falconFlap) * 0.12;
+        for (const w of wings) w.rotation.x = w.userData.side * (0.1 + flap);
+      }
+    },
+  };
 }
 
 export const buildWeapon = buildFalconerWeapon;

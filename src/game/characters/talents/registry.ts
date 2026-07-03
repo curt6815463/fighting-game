@@ -18,14 +18,15 @@
 //   cooldownRate    冷卻流速倍率（playerState tickCooldowns）       例：bloodlust 失血加速
 //   onTimers        每幀計時（playerState tickCharacterTimers）     例：iaido 計時累積
 //   onRecovery      每幀被動回復（playerState tickPassiveRecovery） 例：lifebloom 持續回血
+//   beforeActionExecute 施放前、扣資源與設 CD 後、executeAction 前 例：iaido 設定本次居合窗口
 //   onCastResolved  施放後（casting tryAction/tryUltimate）         例：timeprism 施放後自我 haste
+//   modifyAppliedEffect 施加狀態前修正 effect 參數                 例：pyromancy 強化 burn / 抑制 chill 滿層
+//   onEntityDeath  任一實體死亡後的場上反應                       例：causality 擴散 timehex
+//   outgoingAura / onOwnedMinionDealt / modifyDotDamage / onDotDealt
+//                  跨實體 aura、召喚物命中、DoT 傷害與 DoT 後續效果
 // 每個角色只有一個天賦，故同一 hook 不會有跨天賦的順序問題（互斥）。
 //
-// 仍內聯於各檔、尚未納入 registry 的天賦邏輯（屬 aura / 跨實體 / 與施放序列緊密耦合，
-// 需要更專屬的 hook，之後可增量搬移；call-site 註解已標示）：
-//   warsong（bard，aura）、plague（hexer，死亡傳染 aura）、summonbond 的召喚物回主（damage.ts）、
-//   pyromancy（combat，強化 burn 效果）、undeath（effects DoT 汲取）、
-//   iaido 居合就緒判定（casting，讀寫 iaiReady、與施放序列緊密耦合）。
+// 新增天賦時優先放在角色自己的 talent.ts，只有缺少合適 call-site 時才擴充此 registry。
 // ──────────────────────────────────────────────────────────────────
 
 export interface TalentCtx {
@@ -45,12 +46,19 @@ export interface TalentHooks {
   modifyIncoming?(c: TalentCtx): number;
   onDealt?(c: TalentCtx): void;
   onAttacked?(c: TalentCtx): number | void;
+  outgoingAura?(ctx: { state: any; owner: any; attacker: any; target: any; dmg: number; talent: any; isAlly: any }): number;
+  onOwnedMinionDealt?(ctx: { state: any; owner: any; minion: any; target: any; dmg: number; talent: any; applyHeal: any }): void;
+  modifyDotDamage?(ctx: { state: any; source: any; target: any; effect: any; kind: string; dmg: number; talent: any }): number;
+  onDotDealt?(ctx: { state: any; source: any; target: any; effect: any; kind: string; dmg: number; talent: any; applyHeal: any }): void;
   // ---- 生命週期 hook（playerState / casting；參數較精簡，於各自 call-site 呼叫）----
   cooldownRate?(state: any, p: any, talent: any): number;            // 冷卻流速倍率（預設 1）— tickCooldowns
   onTimers?(state: any, p: any, dt: number, talent: any): void;      // 每幀計時 — tickCharacterTimers
   onRecovery?(state: any, p: any, dt: number, talent: any): void;    // 每幀被動回復 — tickPassiveRecovery
+  beforeActionExecute?(state: any, p: any, action: any, slot: string, talent: any): void; // 執行 action 前 — casting
   onCastResolved?(state: any, p: any, action: any, slot: string, talent: any): void; // 施放後 — casting
   canCast?(state: any, p: any, slot: string, talent: any): boolean;                  // 施放前判定（回 false 阻擋施放）— casting
+  modifyAppliedEffect?(ctx: { state: any; source: any; target: any; effect: any; talent: any; role: 'source' | 'target' }): any; // 施加狀態前 — combat.applyEffectFrom
+  onEntityDeath?(ctx: { state: any; owner: any; corpse: any; killer: any; talent: any; applyEffect: any; addFx: any; isEnemy: any }): void;
 }
 
 const REGISTRY = new Map<string, TalentHooks>();

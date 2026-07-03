@@ -1,12 +1,12 @@
 import { ARENA, PLAYER_RADIUS } from '../constants.js';
 import { clamp, dist } from '../entities/math.ts';
-import { makeProjectile, makeZone } from '../entities/factories.ts';
+import { makeZone } from '../entities/factories.ts';
 import { dealDamage } from '../entities/damage.ts';
 import { applyEffect } from '../entities/effects.ts';
 import { applyHeal } from '../entities/heal.ts';
 import { addFx } from '../entities/fx.ts';
 import { isEnemy } from '../entities/team.ts';
-import { applyEffectFrom, bodyR, meleeHit, outMult } from './combat.ts';
+import { applyEffectFrom, bodyR, meleeHit } from './combat.ts';
 import type { GameState, Player } from '../types';
 
 // 腳本化移動（衝鑂/躍擊）：進行中接管移動。回傳 true 表示本幀已接管。
@@ -129,34 +129,4 @@ export function processTrail(state: GameState, p: Player, dt: number) {
     tr.lasty = p.y;
   }
   if (tr.remaining <= 0) p.trail = null;
-}
-
-// 連射狀態（弓箭手大招「天羽箭暴」）：每 interval 朝鎖定方向射一發快速箭，不限制移動。
-// 鎖向由 movement.ts（`!p.barrage` 條件）負責，本函式只管生彈與計時。
-export function processBarrage(state: GameState, p: Player, dt: number) {
-  const b = p.barrage;
-  if (!b) return;
-  b.remaining -= dt;
-  b.fireTimer -= dt;
-  const m = outMult(p, b);
-  while (b.fireTimer <= 0) {
-    b.fireTimer += b.interval;
-    const ang = b.facing + (b.spread ? (Math.random() - 0.5) * b.spread : 0);
-    const c = Math.cos(ang);
-    const s = Math.sin(ang);
-    state.projectiles.push(makeProjectile(p.id, p.x + c * PLAYER_RADIUS, p.y + s * PLAYER_RADIUS, c * b.speed, s * b.speed, {
-      dmg: b.dmg * m,
-      radius: b.radius,
-      lifetime: b.lifetime,
-      color: b.color,
-      knockback: b.knockback,
-      pierce: b.pierce,
-      effect: b.effect,
-      vfx: b.vfx,
-      srcSlot: b.srcSlot,
-    }));
-    // 槍口閃光
-    addFx(state, { type: 'hit', x: p.x + c * PLAYER_RADIUS, y: p.y + s * PLAYER_RADIUS, color: b.color, life: 0.12, radius: b.radius * 1.4, vfx: b.vfx });
-  }
-  if (b.remaining <= 0) p.barrage = null;
 }

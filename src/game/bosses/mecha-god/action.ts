@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { registerBossAction } from '../actions.ts';
 import { makeZone } from '../../entities/factories.ts';
+import { PYLON_MINION_ID } from './pylon.ts';
 
 registerBossAction('summon_pylons', (state, boss, a, h) => {
   // 獲取敵對玩家數量以進行 HP 動態縮放
@@ -15,7 +16,7 @@ registerBossAction('summon_pylons', (state, boss, a, h) => {
   // 移除場上舊的能量柱與警告圈
   for (const key of Object.keys(state.players)) {
     const o = state.players[key];
-    if (o.isMinion && o.charId === -7 && o.ownerId === boss.id) {
+    if (o.isMinion && o.charId === PYLON_MINION_ID && o.ownerId === boss.id) {
       o.alive = false;
       delete state.players[key];
     }
@@ -35,7 +36,7 @@ registerBossAction('summon_pylons', (state, boss, a, h) => {
 
     const pylonId = boss.id + '-pylon-' + idx + '-' + Math.random().toString(36).slice(2, 7);
 
-    const pylonMinion = h.makeBoss(pylonId, -7, px, py, h.BOSS_TEAM, {
+    const pylonMinion = h.makeBoss(pylonId, PYLON_MINION_ID, px, py, h.BOSS_TEAM, {
       isMinion: true,
       ownerId: boss.id,
       aiId: 'fake', // 無 AI

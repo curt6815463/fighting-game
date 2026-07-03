@@ -7,10 +7,10 @@
 //   • onDealt：命中累積少量怒氣（次要來源）。
 //   • onRecovery：脫戰衰減；怒氣達門檻「戰意沸騰」給 overdrive（移動＋攻速）貼身擾亂。
 //   • onCastResolved：守護壁壘額外蓄怒；大招釋放全部怒氣，依怒氣量化身不動壁壘（護體＋反射）。
-// 怒氣存於 p.fury（0..FURY_MAX，factories 初始化、snapshot 同步給加入者 HUD），脫戰計時用 p.furyIdle。
+// 怒氣存於 p.fury（0..FURY_MAX，snapshot 同步給加入者 HUD），脫戰計時用 p.furyIdle。
 import { registerTalent } from '../../talents/registry';
 import { applyEffect } from '../../../entities/effects.ts';
-import { FURY_MAX } from '../../../constants.js';
+import { FURY_MAX } from './constants.ts';
 
 registerTalent('bulwark', {
   // 受擊：減傷隨怒氣 12%→30%，並依面對的傷害累積怒氣。

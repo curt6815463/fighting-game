@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { serializeNetworkSnapshot } from '../src/game/controller.ts';
+import { NET_PLAYER_FIELDS, serializeNetworkSnapshot } from '../src/game/controller.ts';
 import { createInitialState, makeDropItem } from '../src/game/entities/factories.ts';
 
 describe('network snapshot serialization', () => {
@@ -67,6 +67,27 @@ describe('network snapshot serialization', () => {
     expect(snapshot.players.p1.itemMp).toBe(0);
   });
 
+  it('syncs character-declared renderer state without adding it to the base manifest', () => {
+    expect(NET_PLAYER_FIELDS).not.toContain('fury');
+    expect(NET_PLAYER_FIELDS).not.toContain('chi');
+    expect(NET_PLAYER_FIELDS).not.toContain('magicSwordsman');
+
+    const state: any = createInitialState([
+      { id: 'tank', name: 'Tank', charId: 'tank', team: 1 },
+      { id: 'fighter', name: 'Fighter', charId: 'fighter', team: 1 },
+      { id: 'sword', name: 'Sword', charId: 'magic-swordsman', team: 1 },
+    ]);
+    state.players.tank.fury = 42;
+    state.players.fighter.chi = 3;
+    state.players.sword.magicSwordsman = { swordEnergy: 4 };
+
+    const snapshot = serializeNetworkSnapshot(state);
+
+    expect(snapshot.players.tank.fury).toBe(42);
+    expect(snapshot.players.fighter.chi).toBe(3);
+    expect(snapshot.players.sword.magicSwordsman.swordEnergy).toBe(4);
+  });
+
   it('syncs magnet artificer multiplayer display objects', () => {
     const state: any = createInitialState([
       { id: 'p0', name: 'Host Player', charId: 'warrior', team: 1 },
@@ -93,6 +114,7 @@ describe('network snapshot serialization', () => {
       team: 2,
       magnetOverload: true,
     };
+    state.bossId = 'boss-8';
     state.bossCustom = {
       magnetArtificer: {
         polarities: {

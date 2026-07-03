@@ -364,15 +364,11 @@ export function createCharacterModel(charId) {
   rootRing.visible = false;
   group.add(rootRing);
 
-  if (parts.barrageWings) group.add(parts.barrageWings);
-  if (parts.falcon) group.add(parts.falcon);
-  if (parts.cape) group.add(parts.cape);
-  if (parts.capeTrim) group.add(parts.capeTrim);
-  if (parts.swordEnergyOrbs) { for (const o of parts.swordEnergyOrbs) group.add(o); }
-  if (parts.extraOrbs) { for (const e of parts.extraOrbs) group.add(e); }
+  const attachments = Array.isArray(parts.attachments) ? parts.attachments : [];
+  for (const attachment of attachments) group.add(attachment);
 
   group.userData = {
-    parts: { torso, head, armL, armR, legL, legR, emblem, shieldRing, shieldShell, rageRing, burnRing, frozenRingLow, frozenRingHigh, stunRing, stunHalo, rootRing, handR, face, accents, starOrbitShards: parts.starOrbitShards, swordEnergyOrbs: parts.swordEnergyOrbs, extraOrbs: parts.extraOrbs, barrageWings: parts.barrageWings, falcon: parts.falcon, customUpdate: parts.customUpdate, cape: parts.cape, capeTrim: parts.capeTrim },
+    parts: { torso, head, armL, armR, legL, legR, emblem, shieldRing, shieldShell, rageRing, burnRing, frozenRingLow, frozenRingHigh, stunRing, stunHalo, rootRing, handR, face, accents, attachments, customUpdate: parts.customUpdate },
     skinMats,
     cfg,
     phase: Math.random() * Math.PI * 2,
@@ -866,140 +862,6 @@ export function animateModel(group, dt, info) {
             o.position.set(4 + Math.cos(a) * 5, 2, Math.sin(a) * 5);
           }
         }
-      }
-    }
-
-    if (parts.starOrbitShards) {
-      const orbit = p && p.starOrbit;
-      const count = Math.max(0, Math.min(3, orbit?.shards ?? 0));
-      const baseAngle = orbit?.angle ?? ud.breathe * 1.9;
-      for (let i = 0; i < parts.starOrbitShards.length; i++) {
-        const shard = parts.starOrbitShards[i];
-        shard.visible = i < count;
-        if (!shard.visible) continue;
-        const a = baseAngle + i * (Math.PI * 2 / Math.max(1, count));
-        const r = 56 + count * 10;
-        shard.position.set(Math.cos(a) * r, 31 + Math.sin(a * 2) * 4, Math.sin(a) * r);
-        shard.rotation.x += dt * 1.2;
-        shard.rotation.y += dt * 2.8;
-        shard.rotation.z += dt * 0.8;
-        shard.scale.setScalar(1 + Math.sin(ud.breathe * 2 + i) * 0.035);
-      }
-    }
-
-    // 魔劍士劍氣球體：依 swordEnergy 數量顯示
-    if (parts.swordEnergyOrbs) {
-      const se = p && p.magicSwordsman;
-      const count = se ? Math.max(0, Math.min(5, se.swordEnergy || 0)) : 0;
-      const baseY = 18;
-      for (let i = 0; i < parts.swordEnergyOrbs.length; i++) {
-        const orb = parts.swordEnergyOrbs[i];
-        orb.visible = i < count;
-        if (!orb.visible) continue;
-        const a = ud.breathe * 1.4 + i * (Math.PI * 2 / Math.max(1, count));
-        const r = 48 + count * 3;
-        orb.position.set(Math.cos(a) * r, baseY + Math.sin(a * 1.5 + i * 1.2) * 8, Math.sin(a) * r);
-        orb.rotation.x += dt * 1.6;
-        orb.rotation.y += dt * 2.5;
-        orb.rotation.z += dt * 1.0;
-        const pulse = 1 + Math.sin(ud.breathe * 3 + i * 1.5) * 0.08;
-        orb.scale.setScalar(pulse);
-      }
-    }
-
-    // 魔劍士額外浮游小劍氣（3 顆，始終可見，低速公轉）
-    if (parts.extraOrbs) {
-      for (let i = 0; i < parts.extraOrbs.length; i++) {
-        const extra = parts.extraOrbs[i];
-        const a = ud.breathe * 0.6 + i * (Math.PI * 2 / 3);
-        const r = 62;
-        extra.position.set(Math.cos(a) * r, 22 + Math.sin(a * 2 + i) * 5, Math.sin(a) * r);
-        extra.rotation.x += dt * 0.8;
-        extra.rotation.y += dt * 1.2;
-        extra.rotation.z += dt * 0.4;
-        extra.scale.setScalar(1 + Math.sin(ud.breathe * 1.5 + i) * 0.05);
-      }
-    }
-
-    // 魔劍士披風飄動
-    if (parts.cape) {
-      const sway = Math.sin(ud.breathe * 0.8) * 0.06;
-      parts.cape.rotation.z = sway;
-    }
-    if (parts.capeTrim) {
-      const sway = Math.sin(ud.breathe * 0.8 + 0.3) * 0.08;
-      parts.capeTrim.rotation.z = sway;
-    }
-
-    // 天羽箭暴 — 磅礴雙翼：依 p.barrage 展開/收合，作為 player group 子物件自動跟隨移動。
-    if (parts.barrageWings) {
-      const on = p && p.barrage;
-      ud.wingT = on ? Math.min(1, (ud.wingT || 0) + dt * 3.0)   // 展開 ~0.33s
-                    : Math.max(0, (ud.wingT || 0) - dt * 4.5);  // 收合更快
-      const wings = parts.barrageWings;
-      wings.visible = ud.wingT > 0.001;
-      if (wings.visible) {
-        const e = ud.wingT * ud.wingT * (3 - 2 * ud.wingT);     // smoothstep 展開緩動
-        const flap = Math.sin(ud.breathe * 5) * 0.14;           // 拍動
-        for (const side of wings.children) {
-          const sz = side.userData.side;
-          const feathers = side.userData.feathers;
-          for (let i = 0; i < feathers.length; i++) {
-            const fan = feathers[i].userData.fan;
-            // 收合(e=0)時幾近直立貼背；展開時外擺成扇 + 拍動
-            feathers[i].rotation.x = sz * (0.05 + fan * 1.05 * e + flap * (0.4 + i * 0.12) * e);
-          }
-        }
-        wings.scale.setScalar(0.7 + 0.6 * e);                   // 展開後放大到 1.3×
-        if (wings.userData.mat) wings.userData.mat.opacity = 0.25 + 0.72 * e;
-      }
-    }
-
-    // 鳥獵鷹隼：平時棲於肩、攻擊時「飛出俯衝」再返回。
-    // 由 sim 的 p._falcon.flight = { t, dur } 驅動（falcon.ts）；模型恆面向 +X → 往 +X 飛即朝敵。
-    if (parts.falcon) {
-      const fal = parts.falcon;
-      const rest = fal.userData.rest;
-      const wings = fal.userData.wings || [];
-      const fl = p && p._falcon && p._falcon.flight;
-      ud.falconFlap = (ud.falconFlap || 0) + dt * (fl ? 26 : 6);
-      if (fl) {
-        const u = Math.min(1, fl.t / (fl.dur || 0.62));
-        const arc = Math.sin(u * Math.PI);          // 0→1→0：去程＋回程
-        // 把「世界位移(tdx,tdy)」轉成模型本地座標（group 已繞 Y 轉 ud.curFacing）→ 飛到敵人實際位置。
-        const th = ud.curFacing || 0, c2 = Math.cos(th), s2 = Math.sin(th);
-        const wx = fl.tdx || 0, wz = fl.tdy || 0;
-        const lx = wx * c2 - wz * s2;
-        const lz = wx * s2 + wz * c2;
-        // 弧線飛行：沿「棲位→敵人」推進(arc)，外加垂直方向的側擺 → 去程/回程走不同側形成弧/環，不是直線來回。
-        const dirx = lx - rest.x, dirz = lz - rest.z;
-        const dl = Math.hypot(dirx, dirz) || 1;
-        const perpx = -dirz / dl, perpz = dirx / dl;
-        const lateral = Math.sin(u * Math.PI * 2) * Math.min(70, dl * 0.22); // 來回不同側的弧度（隨距離、上限 70）
-        fal.position.x = rest.x + dirx * arc + perpx * lateral;
-        fal.position.z = rest.z + dirz * arc + perpz * lateral;
-        fal.position.y = rest.y + (24 - rest.y) * arc + Math.sin(u * Math.PI) * 8; // 拋物高度：先升後俯衝下探
-        // 鷹頭朝「實際飛行方向」：用上一幀位移求向量（含弧線側擺）→ 去程朝敵、回程朝你都自然。
-        const hx = fal.position.x - (ud.falPrevX != null ? ud.falPrevX : fal.position.x);
-        const hz = fal.position.z - (ud.falPrevZ != null ? ud.falPrevZ : fal.position.z);
-        if (Math.hypot(hx, hz) > 0.05) fal.rotation.y = Math.atan2(-hz, hx);
-        ud.falPrevX = fal.position.x; ud.falPrevZ = fal.position.z;
-        fal.rotation.z = -arc * 0.4 + lateral * 0.01;    // 俯衝前傾 + 轉彎側傾
-        const flap = Math.sin(ud.falconFlap) * 0.6;      // 急速拍翼
-        for (const w of wings) w.rotation.x = w.userData.side * (0.2 + flap);
-        const storm = p && p._falcon && p._falcon.frenzy ? 1.3 : 1; // 大絕風暴：鷹更巨大有壓迫感
-        fal.scale.setScalar((fal.userData.baseScale || 1) * (1.5 + arc * 0.5) * storm);
-      } else {
-        // 棲息：輕微上下浮動 + 緩慢拍翼，平滑回到棲位。
-        fal.position.x += (rest.x - fal.position.x) * Math.min(1, dt * 10);
-        fal.position.z += (rest.z - fal.position.z) * Math.min(1, dt * 10);
-        fal.position.y = rest.y + Math.sin(ud.breathe * 2) * 0.6;
-        fal.rotation.z += (0 - fal.rotation.z) * Math.min(1, dt * 10);
-        fal.rotation.y += (0 - fal.rotation.y) * Math.min(1, dt * 10);
-        fal.scale.setScalar(fal.userData.baseScale || 1);
-        ud.falPrevX = null; ud.falPrevZ = null;
-        const flap = Math.sin(ud.falconFlap) * 0.12;
-        for (const w of wings) w.rotation.x = w.userData.side * (0.1 + flap);
       }
     }
 

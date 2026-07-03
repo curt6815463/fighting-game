@@ -390,7 +390,19 @@ export function buildModel(ctx) {
   rebuildLimb(legL, false, warmIvoryMat, goldMat, iceMat);
   rebuildLimb(legR, false, warmIvoryMat, goldMat, iceMat);
 
-  return { torso, head, armL, armR, legL, legR, cape, capeTrim };
+  return {
+    torso,
+    head,
+    armL,
+    armR,
+    legL,
+    legR,
+    attachments: [cape, capeTrim],
+    customUpdate(_dt, _group, ud) {
+      cape.rotation.z = Math.sin(ud.breathe * 0.8) * 0.06;
+      capeTrim.rotation.z = Math.sin(ud.breathe * 0.8 + 0.3) * 0.08;
+    },
+  };
 }
 
 export const buildWeapon = buildElementalistWeapon;

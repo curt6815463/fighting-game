@@ -265,6 +265,8 @@ const data = {
   },
   ai: 'magnet_artificer',
   mechanic: { magneticPolarity: true, magneticAnchors: true },
+  snapshotFields: ['magnetOverload'],
+  playerSnapshotFields: ['magneticPolarity'],
   hint: '被標記 N/S 極性後觀察磁錨顏色：同極會推開，異極會拉近。利用吸斥修正站位，離開坍縮爆發圈。',
   tags: [
     { icon: 'N', text: '藍色 N 極標記' },

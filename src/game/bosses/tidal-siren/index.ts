@@ -4,6 +4,7 @@ import { SLOW, STUN } from '../effects.js';
 import { aiProfile } from './ai.ts';
 import { modelConfig, buildModel, buildWeapon } from './model.ts';
 import { loadVfx } from './vfx.ts';
+import { BUBBLE_MINION_ID } from './bubble.ts';
 import './action.ts'; // Ensure custom actions are registered
 import { ARENA } from '../../constants.js';
 import { addFx } from '../../entities/fx.ts';
@@ -328,7 +329,7 @@ const data = {
 
     const activeWarningZoneIds = new Set();
     for (const o of Object.values(state.players) as any[]) {
-      if (o.isMinion && o.charId === -3 && o.alive) {
+      if (o.isMinion && o.charId === BUBBLE_MINION_ID && o.alive) {
         if (o.warningZoneId) activeWarningZoneIds.add(o.warningZoneId);
 
         // 強制鎖定水泡在原地，不受任何擊退與暗流漂移影響

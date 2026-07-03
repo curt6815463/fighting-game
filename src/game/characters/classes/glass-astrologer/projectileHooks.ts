@@ -24,6 +24,7 @@ function spawnReflectedShard(projectile: Projectile, dir: { x: number; y: number
     glassReflectBonus: projectile.glassReflectBonus || 0.35,
     glassMarkOnReflected: true,
     glassPierceOnReflect: true,
+    glassSplitOnMirror: false,
     glassSplitChild: true,
     lastMirrorId: projectile.lastMirrorId,
   }));

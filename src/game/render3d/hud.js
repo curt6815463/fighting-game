@@ -10,11 +10,13 @@ import { el, setText, setStyle, setClass, setHtml, pct, hexA, esc } from './hud/
 import { updateHudResourceBars } from './hud/resourceBars.js';
 import { getSelfAlert } from './hud/selfAlerts.js';
 import { getHudWidgets } from './hud/widgets.js';
+import { getNameplateDecorators } from './hud/nameplates.js';
 import { getJoystickSettings, subscribeJoystickSettings } from '../../utils/joystickSettings';
 // 以 glob 自動載入所有 hud widget（side-effect 註冊到 widgets registry，仿 vfx）。
 import.meta.glob('./hud/widgets/*.js', { eager: true });
 import.meta.glob('./hud/resourceBars/*.js', { eager: true });
 import.meta.glob('./hud/selfAlerts/*.js', { eager: true });
+import.meta.glob('../characters/classes/*/hudNameplate.js', { eager: true });
 
 const HEAD_Y = 90;
 
@@ -55,12 +57,12 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
   const ultWrapD = el('div', 'hud-bar ult', selfDesktop);
   const ultFillD = el('i', '', ultWrapD);
   const ultTxtD = el('span', '', ultWrapD);
-  const furyWrapD = el('div', 'hud-bar fury', selfDesktop); // 坦克專屬怒氣條（非坦克隱藏）
-  const furyFillD = el('i', '', furyWrapD);
-  const furyTxtD = el('span', '', furyWrapD);
-  const seWrapD = el('div', 'hud-bar sword-energy', selfDesktop); // 魔劍士專屬劍氣條
-  const seFillD = el('i', '', seWrapD);
-  const seTxtD = el('span', '', seWrapD);
+  const resourcePrimaryWrapD = el('div', 'hud-bar resource-slot', selfDesktop);
+  const resourcePrimaryFillD = el('i', '', resourcePrimaryWrapD);
+  const resourcePrimaryTxtD = el('span', '', resourcePrimaryWrapD);
+  const resourceSecondaryWrapD = el('div', 'hud-bar resource-slot', selfDesktop);
+  const resourceSecondaryFillD = el('i', '', resourceSecondaryWrapD);
+  const resourceSecondaryTxtD = el('span', '', resourceSecondaryWrapD);
   const buffsD = el('div', 'hud-buffs', selfDesktop);
   const skillsContainerD = el('div', 'hud-skills-container', selfDesktop);
   const skillsD = el('div', 'hud-skills', skillsContainerD);
@@ -92,12 +94,12 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
   const mpWrapM = el('div', 'hud-mobile-bar mp', barsWrapM);
   const mpFillM = el('i', '', mpWrapM);
   const mpTxtM = el('span', '', mpWrapM);
-  const furyWrapM = el('div', 'hud-mobile-bar fury', barsWrapM); // 坦克專屬怒氣條（非坦克隱藏）
-  const furyFillM = el('i', '', furyWrapM);
-  const furyTxtM = el('span', '', furyWrapM);
-  const seWrapM = el('div', 'hud-mobile-bar sword-energy', barsWrapM); // 魔劍士專屬劍氣條
-  const seFillM = el('i', '', seWrapM);
-  const seTxtM = el('span', '', seWrapM);
+  const resourcePrimaryWrapM = el('div', 'hud-mobile-bar resource-slot', barsWrapM);
+  const resourcePrimaryFillM = el('i', '', resourcePrimaryWrapM);
+  const resourcePrimaryTxtM = el('span', '', resourcePrimaryWrapM);
+  const resourceSecondaryWrapM = el('div', 'hud-mobile-bar resource-slot', barsWrapM);
+  const resourceSecondaryFillM = el('i', '', resourceSecondaryWrapM);
+  const resourceSecondaryTxtM = el('span', '', resourceSecondaryWrapM);
   const buffsM = el('div', 'hud-mobile-buffs', selfMobile);
 
   // ---- 行動端虛擬搖桿與按鍵 ----
@@ -554,6 +556,7 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
   // 各 widget 在 mount 時建立自己的 DOM、回傳 handle；update() 尾端統一每幀更新。
   const widgetCtx = { layer, scene, camera, stage, hooks, isMobile };
   const mountedWidgets = getHudWidgets().map((w) => ({ w, handle: w.mount ? w.mount(widgetCtx) : null }));
+  const nameplateDecorators = getNameplateDecorators();
 
   function ensurePlate(pid) {
     let pl = plates.get(pid);
@@ -620,8 +623,8 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
       seen.add(p.id);
       const pl = ensurePlate(p.id);
       let headY = HEAD_Y * (p.scale && p.scale > 1 ? p.scale : 1); // 巨大魔王名牌抬高到頭頂
-      if (p.charId === 'royal-magician') {
-        headY += 24; // Lift label up to prevent overlapping the magician's top hat
+      for (const decorator of nameplateDecorators) {
+        if (decorator.adjustHeadY) headY = decorator.adjustHeadY({ state, selfId, player: p, plate: pl, headY });
       }
       pl.obj.position.set(sceneX(p.x), headY, sceneZ(p.y));
       if (downed) {
@@ -639,52 +642,9 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
       setStyle(pl.mp, 'width', pct(p.mana / p.maxMana));
       setHtml(pl.buffs, buildPlateBuffs(p));
 
-      // Royal Magician Poker Suits 2D HUD Render (Above HP Bar)
-      if (p.charId === 'royal-magician' && Array.isArray(p.royalCards) && p.royalCards.length > 0) {
-        let cardsHtml = '';
-        for (let i = 0; i < p.royalCards.length; i++) {
-          const suit = p.royalCards[i];
-          let color = '#005f73';
-          let char = '♠';
-          let background = '#ffffff';
-          let border = '1.5px solid #d4af37';
-          let textShadow = 'none';
-
-          if (suit === 'R') {
-            color = '#d90429';
-            char = '♦';
-          } else if (suit === 'J') {
-            color = '#ffffff';
-            char = '🃏';
-            background = 'linear-gradient(135deg, #7b2ff7, #ffd166)';
-            border = '2px solid #ffffff';
-            textShadow = '0 0 4px #7b2ff7';
-          }
-
-          cardsHtml += `<span style="
-            display: inline-block;
-            width: 16px;
-            height: 24px;
-            line-height: 24px;
-            background: ${background};
-            border: ${border};
-            border-radius: 3.5px;
-            color: ${color};
-            font-weight: 900;
-            font-size: 16px;
-            text-align: center;
-            margin: 0 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.6);
-            font-family: 'Arial Black', Impact, sans-serif;
-            text-shadow: ${textShadow};
-          ">${char}</span>`;
-        }
-        setHtml(pl.ncards, cardsHtml);
-        setStyle(pl.ncards, 'display', 'block');
-        setStyle(pl.ncards, 'margin-bottom', '6px');
-        setStyle(pl.ncards, 'text-align', 'center');
-      } else {
-        setStyle(pl.ncards, 'display', 'none');
+      setStyle(pl.ncards, 'display', 'none');
+      for (const decorator of nameplateDecorators) {
+        if (decorator.update) decorator.update({ state, selfId, player: p, plate: pl, setHtml, setStyle });
       }
 
       const sInfo = stunInfo(p);
@@ -726,8 +686,8 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
         updateHudResourceBars(
           { state, selfId, player: me, character: c, isMobile: false },
           {
-            fury: { wrap: furyWrapD, fill: furyFillD, text: furyTxtD },
-            'sword-energy': { wrap: seWrapD, fill: seFillD, text: seTxtD },
+            primary: { wrap: resourcePrimaryWrapD, fill: resourcePrimaryFillD, text: resourcePrimaryTxtD, baseClass: 'hud-bar resource-slot' },
+            secondary: { wrap: resourceSecondaryWrapD, fill: resourceSecondaryFillD, text: resourceSecondaryTxtD, baseClass: 'hud-bar resource-slot' },
           },
         );
         setHtml(buffsD, buildBuffHtml(me));
@@ -753,8 +713,8 @@ export function createHud({ stage, scene, camera, controlScheme = 'wasd-jkl', ho
         updateHudResourceBars(
           { state, selfId, player: me, character: c, isMobile: true },
           {
-            fury: { wrap: furyWrapM, fill: furyFillM, text: furyTxtM },
-            'sword-energy': { wrap: seWrapM, fill: seFillM, text: seTxtM },
+            primary: { wrap: resourcePrimaryWrapM, fill: resourcePrimaryFillM, text: resourcePrimaryTxtM, baseClass: 'hud-mobile-bar resource-slot' },
+            secondary: { wrap: resourceSecondaryWrapM, fill: resourceSecondaryFillM, text: resourceSecondaryTxtM, baseClass: 'hud-mobile-bar resource-slot' },
           },
         );
         setHtml(buffsM, buildBuffHtml(me));
